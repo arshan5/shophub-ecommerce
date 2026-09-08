@@ -1,0 +1,130 @@
+.promo-banner {
+  background: linear-gradient(120deg, var(--color-primary), var(--color-primary-light));
+  color: #fff;
+  margin: 40px 0;
+}
+
+.promo-banner-content {
+  padding: 64px 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.promo-eyebrow {
+  color: var(--color-accent);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.promo-banner-content h2 {
+  color: #fff;
+  font-size: 2.1rem;
+}
+
+.promo-banner-content p {
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: 8px;
+}
+
+.why-us {
+  background: var(--color-bg-soft);
+}
+
+.feature-item {
+  text-align: center;
+  padding: 8px;
+}
+
+.feature-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 14px;
+  color: var(--color-primary);
+}
+
+.feature-item h4 {
+  margin-bottom: 6px;
+  font-size: 1rem;
+}
+
+.feature-item p {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.review-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.review-quote-icon {
+  color: var(--color-accent);
+}
+
+.review-card p {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.review-footer span {
+  color: var(--color-accent);
+  letter-spacing: 2px;
+}
+
+.newsletter-section {
+  background: var(--color-bg-soft);
+  border-top: 1px solid var(--color-border);
+}
+
+.newsletter-content {
+  text-align: center;
+  padding: 56px 20px;
+  max-width: 560px;
+}
+
+.newsletter-content p {
+  color: var(--color-text-muted);
+  margin: 10px 0 24px;
+}
+
+.newsletter-content form {
+  display: flex;
+  gap: 10px;
+}
+
+.newsletter-content input {
+  flex: 1;
+  padding: 13px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+}
+
+@media (max-width: 560px) {
+  .newsletter-content form {
+    flex-direction: column;
+  }
+  .promo-banner-content h2 {
+    font-size: 1.6rem;
+  }
+}

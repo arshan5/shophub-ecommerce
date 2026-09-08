@@ -1,0 +1,117 @@
+.cart-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 32px;
+  align-items: start;
+}
+
+.cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cart-item {
+  display: grid;
+  grid-template-columns: 96px 1fr auto auto;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.cart-item-image img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+}
+
+.cart-item-info h3 {
+  font-size: 0.95rem;
+  margin-bottom: 4px;
+}
+
+.cart-item-info p {
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+
+.cart-item-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 10px;
+}
+
+.cart-item-actions button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.cart-item-actions button:hover {
+  color: var(--color-primary);
+}
+
+.cart-item-actions .danger-link:hover {
+  color: var(--color-error);
+}
+
+.cart-item-mobile-controls {
+  display: none;
+}
+
+.cart-item-subtotal {
+  font-weight: 700;
+  font-size: 0.95rem;
+  white-space: nowrap;
+}
+
+.cart-summary {
+  position: sticky;
+  top: calc(var(--header-height) + 20px);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.summary-total {
+  border-bottom: none;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-text);
+  padding-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .cart-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .cart-item {
+    grid-template-columns: 80px 1fr;
+    grid-template-areas: "image info" "image info";
+  }
+  .cart-item-quantity,
+  .cart-item-subtotal {
+    display: none;
+  }
+  .cart-item-mobile-controls {
+    display: block;
+    margin: 10px 0;
+  }
+}
