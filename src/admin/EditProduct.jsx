@@ -21,7 +21,7 @@ export default function EditProduct() {
         }
 
         const response = await fetch(
-          `http://localhost:5000/api/products/${id}`,
+          `${import.meta.env.VITE_API_URL}/api/products/${id}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

@@ -25,7 +25,7 @@ import { useAuth } from "../context/AuthContext";
 
 import "./ProductDetails.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function ProductDetails() {
   const { id } = useParams();

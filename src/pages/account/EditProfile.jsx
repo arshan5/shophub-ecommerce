@@ -36,7 +36,7 @@ export default function EditProfile() {
   const [preview, setPreview] =
     useState(
       user?.avatar
-        ? `http://localhost:5000${user.avatar}`
+        ? `${import.meta.env.VITE_API_URL}${user.avatar}`
         : "https://i.pravatar.cc/100"
     );
 

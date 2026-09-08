@@ -9,6 +9,8 @@ import Modal from "../components/Modal";
 import { useToast } from "../context/ToastContext";
 import "./Admin.css";
 
+const API_URL = import.meta.env.VITE_API_URL;
+
 const emptyForm = {
   name: "",
   description: "",
@@ -17,70 +19,52 @@ const emptyForm = {
 };
 
 export default function Categories() {
-  const [categories, setCategories] =
-    useState([]);
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [modalOpen, setModalOpen] =
-    useState(false);
-
-  const [editingId, setEditingId] =
-    useState(null);
-
-  const [form, setForm] =
-    useState(emptyForm);
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const { showToast } =
-    useToast();
-
+  const { showToast } = useToast();
 
   // =========================
   // FETCH CATEGORIES
   // =========================
 
-  const fetchCategories =
-    async () => {
-      try {
-        const response =
-          await fetch(
-            "http://localhost:5000/api/categories"
-          );
+  const fetchCategories = async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/categories`
+      );
 
-        if (!response.ok) {
-          throw new Error(
-            "Failed to fetch categories"
-          );
-        }
-
-        const data =
-          await response.json();
-
-        setCategories(data);
-      } catch (error) {
-        console.error(
-          "Fetch categories error:",
-          error
+      if (!response.ok) {
+        throw new Error(
+          "Failed to fetch categories"
         );
-
-        showToast(
-          "Failed to load categories.",
-          "error"
-        );
-      } finally {
-        setLoading(false);
       }
-    };
 
+      const data = await response.json();
+
+      setCategories(data);
+    } catch (error) {
+      console.error(
+        "Fetch categories error:",
+        error
+      );
+
+      showToast(
+        "Failed to load categories.",
+        "error"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchCategories();
   }, []);
-
 
   // =========================
   // ADD CATEGORY
@@ -92,10 +76,8 @@ export default function Categories() {
     });
 
     setEditingId(null);
-
     setModalOpen(true);
   };
-
 
   // =========================
   // EDIT CATEGORY
@@ -103,26 +85,15 @@ export default function Categories() {
 
   const openEdit = (category) => {
     setForm({
-      name:
-        category.name || "",
-
-      description:
-        category.description || "",
-
-      image:
-        category.image || "",
-
-      status:
-        category.status || "Active",
+      name: category.name || "",
+      description: category.description || "",
+      image: category.image || "",
+      status: category.status || "Active",
     });
 
-    setEditingId(
-      category._id
-    );
-
+    setEditingId(category._id);
     setModalOpen(true);
   };
-
 
   // =========================
   // FORM CHANGE
@@ -139,7 +110,6 @@ export default function Categories() {
       [name]: value,
     }));
   };
-
 
   // =========================
   // SAVE CATEGORY
@@ -174,45 +144,42 @@ export default function Categories() {
         return;
       }
 
-      const isEdit =
-        !!editingId;
+      const isEdit = !!editingId;
 
       const url = isEdit
-        ? `http://localhost:5000/api/categories/${editingId}`
-        : "http://localhost:5000/api/categories";
+        ? `${API_URL}/api/categories/${editingId}`
+        : `${API_URL}/api/categories`;
 
-      const response =
-        await fetch(url, {
-          method: isEdit
-            ? "PUT"
-            : "POST",
+      const response = await fetch(url, {
+        method: isEdit
+          ? "PUT"
+          : "POST",
 
-          headers: {
-            "Content-Type":
-              "application/json",
+        headers: {
+          "Content-Type":
+            "application/json",
 
-            Authorization:
-              `Bearer ${token}`,
-          },
+          Authorization:
+            `Bearer ${token}`,
+        },
 
-          body: JSON.stringify({
-            name:
-              form.name.trim(),
+        body: JSON.stringify({
+          name:
+            form.name.trim(),
 
-            description:
-              form.description.trim(),
+          description:
+            form.description.trim(),
 
-            image:
-              form.image.trim(),
+          image:
+            form.image.trim(),
 
-            status:
-              form.status,
-          }),
-        });
+          status:
+            form.status,
+        }),
+      });
 
       const data =
         await response.json();
-
 
       // SESSION EXPIRED
 
@@ -238,7 +205,6 @@ export default function Categories() {
         return;
       }
 
-
       // NOT ADMIN
 
       if (
@@ -255,14 +221,12 @@ export default function Categories() {
         return;
       }
 
-
       if (!response.ok) {
         throw new Error(
           data.message ||
             "Failed to save category."
         );
       }
-
 
       if (isEdit) {
         setCategories(
@@ -300,7 +264,6 @@ export default function Categories() {
       });
 
       setEditingId(null);
-
     } catch (error) {
       console.error(
         "Save category error:",
@@ -316,7 +279,6 @@ export default function Categories() {
       setSaving(false);
     }
   };
-
 
   // =========================
   // DELETE CATEGORY
@@ -351,7 +313,7 @@ export default function Categories() {
 
       const response =
         await fetch(
-          `http://localhost:5000/api/categories/${id}`,
+          `${API_URL}/api/categories/${id}`,
           {
             method: "DELETE",
 
@@ -364,7 +326,6 @@ export default function Categories() {
 
       const data =
         await response.json();
-
 
       if (
         response.status === 401
@@ -383,7 +344,6 @@ export default function Categories() {
         return;
       }
 
-
       if (
         response.status === 403
       ) {
@@ -398,14 +358,12 @@ export default function Categories() {
         return;
       }
 
-
       if (!response.ok) {
         throw new Error(
           data.message ||
             "Failed to delete category."
         );
       }
-
 
       setCategories(
         (prev) =>
@@ -419,7 +377,6 @@ export default function Categories() {
         "Category deleted successfully.",
         "success"
       );
-
     } catch (error) {
       console.error(
         "Delete category error:",
@@ -433,7 +390,6 @@ export default function Categories() {
       );
     }
   };
-
 
   // =========================
   // LOADING
@@ -461,7 +417,6 @@ export default function Categories() {
       </div>
     );
   }
-
 
   return (
     <div>
@@ -491,7 +446,6 @@ export default function Categories() {
         </button>
 
       </div>
-
 
       {/* TABLE */}
 
@@ -525,11 +479,9 @@ export default function Categories() {
             </tr>
           </thead>
 
-
           <tbody>
 
-            {categories.length >
-            0 ? (
+            {categories.length > 0 ? (
 
               categories.map(
                 (category) => (
@@ -547,7 +499,7 @@ export default function Categories() {
                               "http"
                             )
                               ? category.image
-                              : `http://localhost:5000${category.image}`
+                              : `${API_URL}${category.image}`
                           }
                           alt={
                             category.name
@@ -577,17 +529,14 @@ export default function Categories() {
                       )}
                     </td>
 
-
                     <td>
                       {category.name}
                     </td>
-
 
                     <td>
                       {category.productCount ||
                         0}
                     </td>
-
 
                     <td>
 
@@ -606,7 +555,6 @@ export default function Categories() {
 
                     </td>
 
-
                     <td>
 
                       <div className="table-actions">
@@ -623,7 +571,6 @@ export default function Categories() {
                             size={14}
                           />
                         </button>
-
 
                         <button
                           className="danger"
@@ -672,7 +619,6 @@ export default function Categories() {
 
       </div>
 
-
       {/* MODAL */}
 
       <Modal
@@ -716,7 +662,6 @@ export default function Categories() {
 
           </div>
 
-
           <div className="form-group">
 
             <label className="form-label">
@@ -738,7 +683,6 @@ export default function Categories() {
 
           </div>
 
-
           <div className="form-group">
 
             <label className="form-label">
@@ -758,7 +702,6 @@ export default function Categories() {
             />
 
           </div>
-
 
           <div className="form-group">
 
@@ -788,7 +731,6 @@ export default function Categories() {
             </select>
 
           </div>
-
 
           <button
             type="submit"

@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 const WishlistContext = createContext(null);
 
 const STORAGE_KEY = "shophub_wishlist";
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 function getProductId(product) {
   return product?._id || product?.id;

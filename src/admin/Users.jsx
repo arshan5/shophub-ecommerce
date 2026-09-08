@@ -39,7 +39,7 @@ export default function Users() {
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/auth/users",
+          `${import.meta.env.VITE_API_URL}/api/auth/users`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -243,7 +243,7 @@ export default function Users() {
                         <img
                           src={
                             u.avatar
-                              ? `http://localhost:5000${u.avatar}`
+                              ? `${import.meta.env.VITE_API_URL}${u.avatar}`
                               : "/placeholder.png"
                           }
                           alt={name}
@@ -361,7 +361,7 @@ export default function Users() {
                     <img
                       src={
                         selectedUser.avatar
-                          ? `http://localhost:5000${selectedUser.avatar}`
+                          ? `${import.meta.env.VITE_API_URL}${selectedUser.avatar}`
                           : "/placeholder.png"
                       }
                       alt={name}

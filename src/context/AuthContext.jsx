@@ -7,7 +7,7 @@ import {
 
 const AuthContext = createContext(null);
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const STORAGE_KEY = "shophub_auth_user";
 const TOKEN_KEY = "shophub_token";

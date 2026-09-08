@@ -15,7 +15,7 @@ export default function Newsletter() {
   const fetchSubscribers = async () => {
     try {
       const response = await fetch(
-        "http://localhost:5000/api/newsletter/subscribers",
+        `${import.meta.env.VITE_API_URL}/api/newsletter/subscribers`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -54,7 +54,7 @@ export default function Newsletter() {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/newsletter/subscribers/${id}`,
+        `${import.meta.env.VITE_API_URL}/api/newsletter/subscribers/${id}`,
         {
           method: "DELETE",
           headers: {

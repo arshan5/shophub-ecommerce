@@ -9,7 +9,7 @@ import { useToast } from "../context/ToastContext";
 
 import "./ProductCard.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const badgeClassMap = {
   New: "badge-new",

@@ -14,7 +14,7 @@ import Breadcrumb from "../components/Breadcrumb";
 import { useCart } from "../context/CartContext";
 import "./Checkout.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 const deliveryOptions = [
   {

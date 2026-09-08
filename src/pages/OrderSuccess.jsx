@@ -3,7 +3,7 @@ import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import { CheckCircle2 } from "lucide-react";
 import { useCart } from "../context/CartContext";
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function OrderSuccess() {
   const [searchParams] = useSearchParams();

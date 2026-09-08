@@ -70,7 +70,7 @@ export default function AccountLayout() {
       return user.avatar;
     }
 
-    return `http://localhost:5000${
+    return `${import.meta.env.VITE_API_URL}${
       user.avatar.startsWith("/")
         ? user.avatar
         : `/${user.avatar}`

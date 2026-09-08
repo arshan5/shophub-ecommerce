@@ -10,7 +10,7 @@ import Breadcrumb from "../components/Breadcrumb";
 import { useToast } from "../context/ToastContext";
 import "./StaticPages.css";
 
-const API_URL = "http://localhost:5000";
+const API_URL = import.meta.env.VITE_API_URL;
 
 export default function Contact() {
   const { showToast } = useToast();

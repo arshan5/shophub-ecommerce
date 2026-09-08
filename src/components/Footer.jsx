@@ -110,7 +110,7 @@ export default function Footer() {
     const fetchSettings = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/settings/public"
+          `${import.meta.env.VITE_API_URL}/api/settings/public`
         );
 
         if (!response.ok) {
@@ -145,7 +145,7 @@ export default function Footer() {
     const fetchCategories = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/categories"
+          `${import.meta.env.VITE_API_URL}/api/categories`
         );
 
         if (!response.ok) {
@@ -181,7 +181,7 @@ export default function Footer() {
 
     try {
       const response = await fetch(
-        "http://localhost:5000/api/newsletter/subscribe",
+        `${import.meta.env.VITE_API_URL}/api/newsletter/subscribe`,
         {
           method: "POST",
 

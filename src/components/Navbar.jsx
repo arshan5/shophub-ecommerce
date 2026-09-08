@@ -50,7 +50,7 @@ const token = localStorage.getItem("shophub_token");
         }
 
         const response = await fetch(
-          "http://localhost:5000/api/settings",
+          `${import.meta.env.VITE_API_URL}/api/settings`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

@@ -4278,7 +4278,7 @@ app.post(
 
 mongoose
   .connect(
-    "mongodb://127.0.0.1:27017/ecommerce"
+    process.env.MONGO_URI
   )
   .then(() => {
     console.log(
@@ -4336,3 +4336,21 @@ app.listen(
     );
   }
 );
+
+
+
+
+
+const seedCatalog = require("./config/seedCatalog");
+
+
+
+connectDB().then(async () => {
+  await seedCatalog();
+
+  app.listen(5000, () => {
+    console.log("Server running on port 5000");
+  });
+});
+
+

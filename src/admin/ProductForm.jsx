@@ -48,7 +48,7 @@ export default function ProductForm({
     const fetchCategories = async () => {
       try {
         const response = await fetch(
-          "http://localhost:5000/api/categories"
+          `${import.meta.env.VITE_API_URL}/api/categories`
         );
 
         if (!response.ok) {
@@ -192,8 +192,8 @@ export default function ProductForm({
         mode === "edit";
 
       const url = isEdit
-        ? `http://localhost:5000/api/products/${form._id}`
-        : "http://localhost:5000/api/products";
+        ? `${import.meta.env.VITE_API_URL}/api/products/${form._id}`
+        : `${import.meta.env.VITE_API_URL}/api/products`;
 
       // =========================
       // FORM DATA

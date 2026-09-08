@@ -31,19 +31,19 @@ export default function Dashboard() {
           usersResponse,
           categoriesResponse,
         ] = await Promise.all([
-          fetch("http://localhost:5000/api/orders", {
+          fetch(`${import.meta.env.VITE_API_URL}/api/orders`, {
             headers,
           }),
 
-          fetch("http://localhost:5000/api/products", {
+          fetch(`${import.meta.env.VITE_API_URL}/api/products`, {
             headers,
           }),
 
-          fetch("http://localhost:5000/api/auth/users", {
+          fetch(`${import.meta.env.VITE_API_URL}/api/auth/users`, {
             headers,
           }),
 
-          fetch("http://localhost:5000/api/categories"),
+          fetch(`${import.meta.env.VITE_API_URL}/api/categories`),
         ]);
 
         if (
@@ -381,7 +381,7 @@ export default function Dashboard() {
     p.image
       ? p.image.startsWith("http")
         ? p.image
-        : `http://localhost:5000${p.image}`
+        : `${import.meta.env.VITE_API_URL}${p.image}`
       : "https://via.placeholder.com/36"
   }
   alt={p.name}
