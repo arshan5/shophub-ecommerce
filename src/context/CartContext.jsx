@@ -10,10 +10,14 @@ const CartContext = createContext(null);
 
 const STORAGE_KEY = "shophub_cart";
 
-// Read cart from localStorage
+// =========================
+// READ CART FROM LOCALSTORAGE
+// =========================
+
 function readStoredCart() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw =
+      localStorage.getItem(STORAGE_KEY);
 
     if (!raw) {
       return [];
@@ -21,100 +25,226 @@ function readStoredCart() {
 
     const cart = JSON.parse(raw);
 
-    return Array.isArray(cart) ? cart : [];
+    return Array.isArray(cart)
+      ? cart
+      : [];
   } catch {
     return [];
   }
 }
 
-// Create a unique key for each cart item
+// =========================
+// UNIQUE CART ITEM KEY
 // Product + color + size
+// =========================
+
 function lineKey(item) {
   return `${item.id}__${item.color || ""}__${item.size || ""}`;
 }
 
-export function CartProvider({ children }) {
-  const [items, setItems] = useState(readStoredCart);
+export function CartProvider({
+  children,
+}) {
+  const [items, setItems] = useState(
+    readStoredCart
+  );
 
-  // Save cart whenever items change
+  // =========================
+  // SAVE CART
+  // =========================
+
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(items)
+    );
   }, [items]);
 
+// =========================
+// ADD PRODUCT TO CART
+// =========================
+
+const addToCart = (
+  product,
+  quantity = 1,
+  options = {}
+) => {
+  const {
+    color = "",
+    size = "",
+  } = options;
+
+  if (!product?.id) {
+    console.error(
+      "Product ID is missing"
+    );
+
+    return false;
+  }
+
+  if (quantity < 1) {
+    return false;
+  }
+
   // =========================
-  // Add Product To Cart
+  // FIND SELECTED COLOR VARIANT
   // =========================
 
-  const addToCart = (
-    product,
-    quantity = 1,
-    options = {}
-  ) => {
-    const {
-      color = "",
-      size = "",
-    } = options;
+  const selectedVariant =
+    Array.isArray(product.variants)
+      ? product.variants.find(
+          (variant) =>
+            variant.color === color
+        )
+      : null;
 
-    if (!product?.id) {
-      console.error("Product ID is missing");
-      return;
-    }
+  // =========================
+  // USE VARIANT STOCK
+  // FALL BACK TO PRODUCT STOCK
+  // =========================
 
-    if (quantity < 1) {
-      return;
-    }
+  const stock = Number(
+    selectedVariant?.stock ??
+      product.stock ??
+      0
+  );
 
-    setItems((prev) => {
-      const key = lineKey({
-        id: product.id,
-        color,
-        size,
-      });
+  if (stock <= 0) {
+    return false;
+  }
 
-      const existingItem = prev.find(
-        (item) => lineKey(item) === key
+  let addedSuccessfully = false;
+
+  setItems((prev) => {
+    const key = lineKey({
+      id: product.id,
+      color,
+      size,
+    });
+
+    const existingItem = prev.find(
+      (item) =>
+        lineKey(item) === key
+    );
+
+    // =========================
+    // PRODUCT ALREADY IN CART
+    // =========================
+
+    if (existingItem) {
+      const currentQuantity =
+        Number(
+          existingItem.quantity || 0
+        );
+
+      const newQuantity = Math.min(
+        currentQuantity +
+          Number(quantity),
+        stock
       );
 
-      // If product already exists
-      if (existingItem) {
-        return prev.map((item) =>
-          lineKey(item) === key
-            ? {
-                ...item,
-                quantity:
-                  item.quantity + quantity,
-              }
-            : item
-        );
+      if (
+        newQuantity ===
+        currentQuantity
+      ) {
+        return prev;
       }
 
-      // Add new product
-      return [
-        ...prev,
-        {
-          id: product.id,
-          name: product.name,
+      addedSuccessfully = true;
 
-          // MongoDB product does not currently have slug
-          slug: product.slug || "",
+      return prev.map((item) =>
+        lineKey(item) === key
+          ? {
+              ...item,
+              quantity:
+                newQuantity,
+              stock,
+            }
+          : item
+      );
+    }
 
-          // ProductDetails converts image into images[]
-          image:
-            product.images?.[0] || "",
+    // =========================
+    // NEW PRODUCT
+    // =========================
 
-          price: Number(product.price) || 0,
+    const safeQuantity =
+      Math.min(
+        Number(quantity),
+        stock
+      );
 
-          color,
-          size,
+    if (safeQuantity <= 0) {
+      return prev;
+    }
 
-          quantity,
-        },
-      ];
-    });
-  };
+    addedSuccessfully = true;
+
+    const regularPrice =
+      Number(product.price || 0);
+
+    const discount =
+      Number(
+        product.discount || 0
+      );
+
+    const salePrice =
+      regularPrice -
+      (regularPrice * discount) /
+        100;
+
+    // =========================
+    // CART IMAGE
+    // USE SELECTED VARIANT IMAGE
+    // WHEN AVAILABLE
+    // =========================
+
+    const cartImage =
+      selectedVariant?.images?.[0] ||
+      product.images?.[0] ||
+      product.image ||
+      "";
+
+    return [
+      ...prev,
+      {
+        id: product.id,
+
+        name: product.name,
+
+        // MongoDB product does not
+        // currently have slug
+        slug:
+          product.slug || "",
+
+        image: cartImage,
+
+        // Actual customer price
+        price: salePrice,
+
+        // Original product price
+        originalPrice:
+          regularPrice,
+
+        // Discount percentage
+        discount,
+
+        color,
+        size,
+
+        quantity: safeQuantity,
+
+        // Save selected variant stock
+        stock,
+      },
+    ];
+  });
+
+  return addedSuccessfully;
+};
 
   // =========================
-  // Remove From Cart
+  // REMOVE FROM CART
   // =========================
 
   const removeFromCart = (
@@ -136,7 +266,7 @@ export function CartProvider({ children }) {
   };
 
   // =========================
-  // Update Quantity
+  // UPDATE QUANTITY
   // =========================
 
   const updateQuantity = (
@@ -150,24 +280,38 @@ export function CartProvider({ children }) {
     }
 
     setItems((prev) =>
-      prev.map((item) =>
-        lineKey(item) ===
-        lineKey({
-          id,
-          color,
-          size,
-        })
-          ? {
-              ...item,
-              quantity,
-            }
-          : item
-      )
+      prev.map((item) => {
+        if (
+          lineKey(item) !==
+          lineKey({
+            id,
+            color,
+            size,
+          })
+        ) {
+          return item;
+        }
+
+        const stock = Number(
+          item.stock || 0
+        );
+
+        const safeQuantity =
+          Math.min(
+            Number(quantity),
+            stock
+          );
+
+        return {
+          ...item,
+          quantity: safeQuantity,
+        };
+      })
     );
   };
 
   // =========================
-  // Clear Cart
+  // CLEAR CART
   // =========================
 
   const clearCart = () => {
@@ -175,7 +319,7 @@ export function CartProvider({ children }) {
   };
 
   // =========================
-  // Subtotal
+  // SUBTOTAL
   // =========================
 
   const subtotal = useMemo(() => {
@@ -189,19 +333,20 @@ export function CartProvider({ children }) {
   }, [items]);
 
   // =========================
-  // Cart Count
+  // CART COUNT
   // =========================
 
   const cartCount = useMemo(() => {
     return items.reduce(
       (total, item) =>
-        total + Number(item.quantity || 0),
+        total +
+        Number(item.quantity || 0),
       0
     );
   }, [items]);
 
   // =========================
-  // Context Value
+  // CONTEXT VALUE
   // =========================
 
   const value = {
@@ -215,18 +360,21 @@ export function CartProvider({ children }) {
   };
 
   return (
-    <CartContext.Provider value={value}>
+    <CartContext.Provider
+      value={value}
+    >
       {children}
     </CartContext.Provider>
   );
 }
 
 // =========================
-// useCart Hook
+// USE CART HOOK
 // =========================
 
 export function useCart() {
-  const context = useContext(CartContext);
+  const context =
+    useContext(CartContext);
 
   if (!context) {
     throw new Error(

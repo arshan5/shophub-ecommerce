@@ -6,6 +6,12 @@ import {
   RotateCcw,
   Headphones,
   Quote,
+  ArrowLeft,
+  ArrowRight,
+  Sparkles,
+  TrendingUp,
+  Clock3,
+  ShoppingBag,
 } from "lucide-react";
 
 import Hero from "../components/Hero";
@@ -47,7 +53,7 @@ const reviews = [
   },
   {
     name: "James Wilson",
-    text: "Great selection and the product descriptions are spot on.",
+    text: "Great selection and the product descriptions are spot on. Everything arrived exactly as expected.",
     rating: 5,
   },
   {
@@ -59,9 +65,14 @@ const reviews = [
 
 export default function Home() {
   const [products, setProducts] = useState([]);
+  const [newArrivals, setNewArrivals] = useState([]);
+  const [bestSellers, setBestSellers] = useState([]);
   const [categories, setCategories] = useState([]);
 
   const [loading, setLoading] = useState(true);
+
+  const [featuredIndex, setFeaturedIndex] =
+    useState(0);
 
   const [subscribeMessage, setSubscribeMessage] =
     useState("");
@@ -73,37 +84,69 @@ export default function Home() {
     useState(false);
 
   // =========================
-  // FETCH PRODUCTS + CATEGORIES
+  // FETCH HOME DATA
   // =========================
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const productsResponse = await fetch(
-          `${API_URL}/api/products`
-        );
+        const [
+          productsResponse,
+          newArrivalsResponse,
+          bestSellersResponse,
+          categoriesResponse,
+        ] = await Promise.all([
+          fetch(`${API_URL}/api/products`),
 
-        const categoriesResponse = await fetch(
-          `${API_URL}/api/categories`
-        );
+          fetch(
+            `${API_URL}/api/products/new-arrivals`
+          ),
 
-        if (!productsResponse.ok) {
-          throw new Error("Products request failed");
+          fetch(
+            `${API_URL}/api/products/best-sellers`
+          ),
+
+          fetch(`${API_URL}/api/categories`),
+        ]);
+
+        if (
+          !productsResponse.ok ||
+          !newArrivalsResponse.ok ||
+          !bestSellersResponse.ok ||
+          !categoriesResponse.ok
+        ) {
+          throw new Error(
+            "Home page data request failed"
+          );
         }
 
-        if (!categoriesResponse.ok) {
-          throw new Error("Categories request failed");
-        }
-
-        const productsData =
-          await productsResponse.json();
-
-        const categoriesData =
-          await categoriesResponse.json();
+        const [
+          productsData,
+          newArrivalsData,
+          bestSellersData,
+          categoriesData,
+        ] = await Promise.all([
+          productsResponse.json(),
+          newArrivalsResponse.json(),
+          bestSellersResponse.json(),
+          categoriesResponse.json(),
+        ]);
 
         setProducts(
           Array.isArray(productsData)
             ? productsData
+            : []
+        );
+
+        setNewArrivals(
+          Array.isArray(newArrivalsData)
+            ? newArrivalsData
+            : []
+        );
+
+        setBestSellers(
+          Array.isArray(bestSellersData)
+            ? bestSellersData
             : []
         );
 
@@ -126,17 +169,87 @@ export default function Home() {
   }, []);
 
   // =========================
-  // PRODUCTS
+  // FEATURED PRODUCTS
+  // =========================
+  // Featured products are selected
+  // separately from New Arrivals
+  // and Best Sellers.
+
+  const bestSellerIds = new Set(
+    bestSellers.map(
+      (product) =>
+        product._id || product.id
+    )
+  );
+
+  const newArrivalIds = new Set(
+    newArrivals.map(
+      (product) =>
+        product._id || product.id
+    )
+  );
+
+  let featuredProducts =
+    products.filter((product) => {
+      const id =
+        product._id || product.id;
+
+      return (
+        !bestSellerIds.has(id) &&
+        !newArrivalIds.has(id)
+      );
+    });
+
+  // If there are not enough different
+  // products, use highly rated products
+  // as fallback.
+
+  if (featuredProducts.length < 4) {
+    featuredProducts = [...products]
+      .sort(
+        (a, b) =>
+          Number(b.rating || 0) -
+          Number(a.rating || 0)
+      )
+      .slice(0, 8);
+  }
+
+  // Maximum 8 featured products
+  featuredProducts =
+    featuredProducts.slice(0, 8);
+
+  // =========================
+  // FEATURED SLIDER
   // =========================
 
-  const featuredProducts =
-    products.slice(0, 4);
+  const featuredVisible =
+    featuredProducts.slice(
+      featuredIndex,
+      featuredIndex + 4
+    );
 
-  const newArrivals =
-    products.slice(0, 4);
+  const canGoNext =
+    featuredIndex + 4 <
+    featuredProducts.length;
 
-  const bestSellers =
-    products.slice(0, 4);
+  const canGoPrevious =
+    featuredIndex > 0;
+
+  const handleFeaturedNext = () => {
+    if (canGoNext) {
+      setFeaturedIndex(
+        (current) => current + 1
+      );
+    }
+  };
+
+  const handleFeaturedPrevious = () => {
+    if (canGoPrevious) {
+      setFeaturedIndex(
+        (current) => current - 1
+      );
+    }
+  };
 
   // =========================
   // NEWSLETTER
@@ -206,12 +319,17 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div>
+      <div className="home-page">
         <Hero />
 
         <section className="section container">
-          <div className="chart-placeholder">
-            Loading store...
+          <div className="home-loading">
+            <div className="home-loading-spinner" />
+
+            <p>
+              Preparing your shopping
+              experience...
+            </p>
           </div>
         </section>
       </div>
@@ -223,34 +341,49 @@ export default function Home() {
   // =========================
 
   return (
-    <div>
+    <div className="home-page">
+
+      {/* =========================
+          HERO
+      ========================= */}
+
       <Hero />
 
-      {/* Categories */}
+      {/* =========================
+          SHOP BY CATEGORY
+      ========================= */}
 
-      <section className="section container">
-        <div className="section-header">
+      <section className="section container home-section">
+        <div className="premium-section-header">
           <div>
+            <span className="section-eyebrow">
+              Explore Collection
+            </span>
+
             <h2 className="section-title">
               Shop by Category
             </h2>
 
             <p className="section-subtitle">
-              Find exactly what you're looking for
+              Discover products curated for
+              every style and lifestyle.
             </p>
           </div>
 
           <Link
             to="/categories"
-            className="text-link"
+            className="premium-text-link"
           >
             View All Categories
+            <ArrowRight size={17} />
           </Link>
         </div>
 
-        <div className="grid grid-3 category-grid">
+        <div className="home-category-grid">
           {categories.length === 0 ? (
-            <p>No categories available.</p>
+            <div className="empty-home-state">
+              No categories available.
+            </div>
           ) : (
             categories
               .slice(0, 6)
@@ -267,246 +400,503 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Products */}
+      {/* =========================
+          FEATURED PRODUCTS
+      ========================= */}
 
-      <section className="section container">
-        <div className="section-header">
+      <section className="section container home-section featured-section">
+        <div className="premium-section-header">
           <div>
+            <span className="section-eyebrow">
+              <Sparkles size={15} />
+              Curated For You
+            </span>
+
             <h2 className="section-title">
               Featured Products
             </h2>
 
             <p className="section-subtitle">
-              Hand-picked items our customers love
+              Hand-picked pieces worth
+              discovering.
             </p>
           </div>
 
-          <Link
-            to="/shop"
-            className="text-link"
-          >
-            View All
-          </Link>
+          <div className="featured-controls">
+            <button
+              type="button"
+              className="slider-arrow"
+              onClick={
+                handleFeaturedPrevious
+              }
+              disabled={!canGoPrevious}
+              aria-label="Previous products"
+            >
+              <ArrowLeft size={19} />
+            </button>
+
+            <button
+              type="button"
+              className="slider-arrow"
+              onClick={handleFeaturedNext}
+              disabled={!canGoNext}
+              aria-label="Next products"
+            >
+              <ArrowRight size={19} />
+            </button>
+          </div>
         </div>
 
-        <ProductGrid
-          products={featuredProducts}
-        />
+        {featuredProducts.length === 0 ? (
+          <div className="empty-home-state">
+            No featured products available.
+          </div>
+        ) : (
+          <div className="featured-slider">
+            <ProductGrid
+              products={featuredVisible}
+            />
+          </div>
+        )}
       </section>
 
-      {/* Promo */}
+      {/* =========================
+          PREMIUM PROMO
+      ========================= */}
 
-      <section className="promo-banner">
-        <div className="container promo-banner-content">
-          <span className="promo-eyebrow">
-            Limited Time Offer
-          </span>
+      <section className="premium-promo">
+        <div className="container premium-promo-inner">
+          <div className="premium-promo-content">
+            <span className="promo-eyebrow">
+              <Sparkles size={15} />
+              Limited Time Collection
+            </span>
 
-          <h2>
-            Up to 40% Off Selected Items
-          </h2>
+            <h2>
+              Elevate Your Everyday
+            </h2>
 
-          <p>
-            Refresh your wardrobe and home with
-            our seasonal sale.
-          </p>
+            <p>
+              Discover premium essentials
+              selected to bring more style,
+              comfort and value to your day.
+            </p>
 
-          <Link
-            to="/shop?filter=sale"
-            className="btn btn-accent btn-lg"
-          >
-            Shop Now
-          </Link>
+            <Link
+              to="/shop?filter=sale"
+              className="premium-promo-button"
+            >
+              Shop the Collection
+              <ArrowRight size={18} />
+            </Link>
+          </div>
+
+          <div className="promo-decoration">
+            <ShoppingBag size={100} />
+          </div>
         </div>
       </section>
+{/* =========================
+    PREMIUM BRAND STATEMENT
+========================= */}
 
-      {/* New Arrivals */}
+<section className="premium-brand-section">
+  <div className="container">
+    <div className="premium-brand-content">
+      <span className="section-eyebrow">
+        The ShopHub Experience
+      </span>
 
-      <section className="section container">
-        <div className="section-header">
+      <h2>
+        More Than Shopping.
+        <br />
+        It's Your Lifestyle.
+      </h2>
+
+      <p>
+        Discover thoughtfully selected products
+        designed to bring quality, style and
+        value into your everyday life.
+      </p>
+
+      <Link
+        to="/shop"
+        className="premium-brand-link"
+      >
+        Discover Our Collection
+        <ArrowRight size={17} />
+      </Link>
+    </div>
+  </div>
+</section>
+
+
+{/* =========================
+    SHOP THE COLLECTION
+========================= */}
+
+<section className="section container collection-section">
+  <div className="premium-section-header centered-header">
+    <div>
+      <span className="section-eyebrow">
+        Curated Collections
+      </span>
+
+      <h2 className="section-title">
+        Shop the Collection
+      </h2>
+
+      <p className="section-subtitle">
+        Find something made for every moment,
+        mood and lifestyle.
+      </p>
+    </div>
+  </div>
+
+  <div className="collection-grid">
+
+    <Link
+      to="/shop"
+      className="collection-card collection-card-large"
+    >
+      <div className="collection-card-content">
+        <span>01</span>
+
+        <h3>
+          Everyday Essentials
+        </h3>
+
+        <p>
+          Simple pieces you'll love using
+          every day.
+        </p>
+
+        <strong>
+          Explore Collection
+          <ArrowRight size={16} />
+        </strong>
+      </div>
+    </Link>
+
+
+    <Link
+      to="/shop"
+      className="collection-card"
+    >
+      <div className="collection-card-content">
+        <span>02</span>
+
+        <h3>
+          Modern Lifestyle
+        </h3>
+
+        <p>
+          Designed for the way you live.
+        </p>
+
+        <strong>
+          Shop Now
+          <ArrowRight size={16} />
+        </strong>
+      </div>
+    </Link>
+
+
+    <Link
+      to="/shop"
+      className="collection-card"
+    >
+      <div className="collection-card-content">
+        <span>03</span>
+
+        <h3>
+          Premium Picks
+        </h3>
+
+        <p>
+          Hand-selected favorites worth
+          discovering.
+        </p>
+
+        <strong>
+          Discover More
+          <ArrowRight size={16} />
+        </strong>
+      </div>
+    </Link>
+
+  </div>
+</section>
+      {/* =========================
+          NEW ARRIVALS
+      ========================= */}
+
+      <section className="section container home-section">
+        <div className="premium-section-header">
           <div>
+            <span className="section-eyebrow">
+              <Clock3 size={15} />
+              Just Added
+            </span>
+
             <h2 className="section-title">
               New Arrivals
             </h2>
 
             <p className="section-subtitle">
-              The latest additions to our catalog
+              The latest additions to our
+              collection.
             </p>
           </div>
 
           <Link
             to="/shop?filter=new"
-            className="text-link"
+            className="premium-text-link"
           >
             View All
+            <ArrowRight size={17} />
           </Link>
         </div>
 
-        <ProductGrid
-          products={newArrivals}
-        />
+        {newArrivals.length === 0 ? (
+          <div className="empty-home-state">
+            No new arrivals available.
+          </div>
+        ) : (
+          <ProductGrid
+            products={newArrivals.slice(0, 4)}
+          />
+        )}
       </section>
 
-      {/* Best Sellers */}
+      {/* =========================
+          BEST SELLERS
+      ========================= */}
 
-      <section className="section container">
-        <div className="section-header">
+      <section className="section container home-section best-seller-section">
+        <div className="premium-section-header">
           <div>
+            <span className="section-eyebrow">
+              <TrendingUp size={15} />
+              Customer Favorites
+            </span>
+
             <h2 className="section-title">
               Best Sellers
             </h2>
 
             <p className="section-subtitle">
-              Most loved by our customers
+              The products our customers are
+              buying the most.
             </p>
           </div>
 
           <Link
             to="/shop?filter=bestseller"
-            className="text-link"
+            className="premium-text-link"
           >
             View All
+            <ArrowRight size={17} />
           </Link>
         </div>
 
-        <ProductGrid
-          products={bestSellers}
-        />
+        {bestSellers.length === 0 ? (
+          <div className="best-seller-empty">
+            <TrendingUp size={28} />
+
+            <h3>
+              Your next favorite might be
+              here.
+            </h3>
+
+            <p>
+              Best sellers will appear here
+              as customers place orders.
+            </p>
+          </div>
+        ) : (
+          <ProductGrid
+            products={bestSellers.slice(0, 4)}
+          />
+        )}
       </section>
 
-      {/* Why Us */}
+      {/* =========================
+          WHY SHOP WITH US
+      ========================= */}
 
-      <section className="section why-us">
+      <section className="section why-us premium-why-us">
         <div className="container">
-          <div className="grid grid-4">
-            {features.map((feature) => (
-              <div
-                key={feature.title}
-                className="feature-item"
-              >
-                <div className="feature-icon">
-                  <feature.icon size={22} />
+          <div className="premium-section-header centered-header">
+            <div>
+              <span className="section-eyebrow">
+                Shop With Confidence
+              </span>
+
+              <h2 className="section-title">
+                Why Shop With Us?
+              </h2>
+
+              <p className="section-subtitle">
+                Everything you need for a
+                simple and secure shopping
+                experience.
+              </p>
+            </div>
+          </div>
+
+          <div className="premium-features-grid">
+            {features.map((feature) => {
+              const Icon = feature.icon;
+
+              return (
+                <div
+                  key={feature.title}
+                  className="premium-feature-card"
+                >
+                  <div className="premium-feature-icon">
+                    <Icon size={23} />
+                  </div>
+
+                  <h4>
+                    {feature.title}
+                  </h4>
+
+                  <p>
+                    {feature.text}
+                  </p>
                 </div>
-
-                <h4>
-                  {feature.title}
-                </h4>
-
-                <p>
-                  {feature.text}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
 
-      {/* Reviews */}
+      {/* =========================
+          REVIEWS
+      ========================= */}
 
-      <section className="section container">
-        <div className="section-header">
+      <section className="section container home-section reviews-section">
+        <div className="premium-section-header centered-header">
           <div>
+            <span className="section-eyebrow">
+              Customer Stories
+            </span>
+
             <h2 className="section-title">
               What Our Customers Say
             </h2>
 
             <p className="section-subtitle">
-              Real feedback from real shoppers
+              Real feedback from shoppers
+              who chose ShopHub.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-3">
+        <div className="premium-reviews-grid">
           {reviews.map((review) => (
             <div
               key={review.name}
-              className="review-card card card-pad"
+              className="premium-review-card"
             >
               <Quote
-                size={22}
+                size={24}
                 className="review-quote-icon"
               />
 
+              <div className="review-stars">
+                {"★".repeat(
+                  review.rating
+                )}
+
+                {"☆".repeat(
+                  5 - review.rating
+                )}
+              </div>
+
               <p>
-                {review.text}
+                "{review.text}"
               </p>
 
               <div className="review-footer">
-                <strong>
-                  {review.name}
-                </strong>
+                <div className="review-avatar">
+                  {review.name
+                    .charAt(0)
+                    .toUpperCase()}
+                </div>
 
-                <span>
-                  {"★".repeat(
-                    review.rating
-                  )}
+                <div>
+                  <strong>
+                    {review.name}
+                  </strong>
 
-                  {"☆".repeat(
-                    5 - review.rating
-                  )}
-                </span>
+                  <span>
+                    Verified Customer
+                  </span>
+                </div>
               </div>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Newsletter */}
+      {/* =========================
+          NEWSLETTER
+      ========================= */}
 
-      <section className="newsletter-section">
-        <div className="container newsletter-content">
-          <h2>
-            Join Our Newsletter
-          </h2>
+      <section className="premium-newsletter">
+        <div className="container">
+          <div className="premium-newsletter-box">
+            <div className="newsletter-copy">
+              <span className="section-eyebrow">
+                Stay in the Loop
+              </span>
 
-          <p>
-            Get 10% off your first order plus
-            updates on new arrivals and exclusive
-            offers.
-          </p>
+              <h2>
+                Get 10% Off Your First Order
+              </h2>
 
-          <form
-            onSubmit={handleNewsletter}
-          >
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter your email"
-              required
-            />
+              <p>
+                Subscribe for new arrivals,
+                exclusive offers and special
+                updates.
+              </p>
+            </div>
 
-            <button
-              type="submit"
-              className="btn btn-accent"
-              disabled={subscribing}
+            <form
+              onSubmit={handleNewsletter}
+              className="premium-newsletter-form"
             >
-              {subscribing
-                ? "Subscribing..."
-                : "Subscribe"}
-            </button>
-          </form>
+              <input
+                type="email"
+                name="email"
+                placeholder="Enter your email address"
+                required
+              />
 
-          {subscribeMessage && (
-            <p
-              style={{
-                marginTop: 12,
-                color: "green",
-              }}
-            >
-              {subscribeMessage}
-            </p>
-          )}
+              <button
+                type="submit"
+                disabled={subscribing}
+              >
+                {subscribing
+                  ? "Subscribing..."
+                  : "Subscribe"}
+              </button>
+            </form>
 
-          {subscribeError && (
-            <p
-              style={{
-                marginTop: 12,
-                color: "#dc2626",
-              }}
-            >
-              {subscribeError}
-            </p>
-          )}
+            {subscribeMessage && (
+              <p className="newsletter-success">
+                {subscribeMessage}
+              </p>
+            )}
+
+            {subscribeError && (
+              <p className="newsletter-error">
+                {subscribeError}
+              </p>
+            )}
+          </div>
         </div>
       </section>
     </div>

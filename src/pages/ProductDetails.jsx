@@ -38,7 +38,17 @@ export default function ProductDetails() {
     useState(false);
 
   const [activeImage, setActiveImage] = useState(0);
+  const [isImageZoomed, setIsImageZoomed] = useState(false);
   const [color, setColor] = useState("");
+
+  const [selectedVariant, setSelectedVariant] =
+    useState(null);
+
+  const galleryImages =
+    selectedVariant?.images?.length
+      ? selectedVariant.images
+      : product?.images || [];
+
   const [size, setSize] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [tab, setTab] = useState("description");
@@ -112,50 +122,49 @@ export default function ProductDetails() {
         }
 
         // Category
-      // Category
-let categoryName = "";
+        let categoryName = "";
 
-if (
-  data.category &&
-  typeof data.category === "object"
-) {
-  categoryName =
-    data.category.name ||
-    data.category.title ||
-    "";
-} else if (data.category) {
-  // Backend is returning category ID
-  try {
-    const categoryResponse = await fetch(
-      `${API_URL}/api/categories`
-    );
+        if (
+          data.category &&
+          typeof data.category === "object"
+        ) {
+          categoryName =
+            data.category.name ||
+            data.category.title ||
+            "";
+        } else if (data.category) {
+          // Backend is returning category ID
+          try {
+            const categoryResponse = await fetch(
+              `${API_URL}/api/categories`
+            );
 
-    const categories =
-      await categoryResponse.json();
+            const categories =
+              await categoryResponse.json();
 
-    const matchedCategory =
-      Array.isArray(categories)
-        ? categories.find(
-            (category) =>
-              String(
-                category._id || category.id
-              ) === String(data.category)
-          )
-        : null;
+            const matchedCategory =
+              Array.isArray(categories)
+                ? categories.find(
+                    (category) =>
+                      String(
+                        category._id || category.id
+                      ) === String(data.category)
+                  )
+                : null;
 
-    categoryName =
-      matchedCategory?.name ||
-      matchedCategory?.title ||
-      data.category;
-  } catch (categoryError) {
-    console.error(
-      "Failed to fetch category:",
-      categoryError
-    );
+            categoryName =
+              matchedCategory?.name ||
+              matchedCategory?.title ||
+              data.category;
+          } catch (categoryError) {
+            console.error(
+              "Failed to fetch category:",
+              categoryError
+            );
 
-    categoryName = data.category;
-  }
-}
+            categoryName = data.category;
+          }
+        }
 
         // Product data for frontend
         const formattedProduct = {
@@ -165,8 +174,40 @@ if (
 
           image: imageUrl,
 
-          images: imageUrl
+          images: Array.isArray(data.images)
+            ? data.images.map((image) => {
+                if (image.startsWith("http")) {
+                  return image;
+                }
+
+                return `${API_URL}${
+                  image.startsWith("/")
+                    ? image
+                    : `/${image}`
+                }`;
+              })
+            : imageUrl
             ? [imageUrl]
+            : [],
+
+          variants: Array.isArray(data.variants)
+            ? data.variants.map((variant) => ({
+                ...variant,
+
+                images: Array.isArray(variant.images)
+                  ? variant.images.map((image) => {
+                      if (image.startsWith("http")) {
+                        return image;
+                      }
+
+                      return `${API_URL}${
+                        image.startsWith("/")
+                          ? image
+                          : `/${image}`
+                      }`;
+                    })
+                  : [],
+              }))
             : [],
 
           category:
@@ -228,10 +269,9 @@ if (
           formattedProduct
         );
 
-        setColor(
-          formattedProduct
-            .colors?.[0] || ""
-        );
+        // NOTE: initial color/variant selection is handled in the
+        // dedicated "SELECT FIRST COLOR VARIANT" effect below, which
+        // runs whenever `product` changes — avoids setting it twice.
 
         setSize(
           formattedProduct
@@ -454,6 +494,60 @@ if (
   ]);
 
   // =====================================================
+  // SELECT FIRST COLOR VARIANT
+  // (Moved above the early `return`s below — hooks must run in the
+  // same order on every render, so this can never live after a
+  // conditional return.)
+  // =====================================================
+
+  useEffect(() => {
+    if (product?.variants?.length > 0) {
+      const firstVariant = product.variants[0];
+
+      setSelectedVariant(firstVariant);
+      setColor(firstVariant.color || "");
+    }
+  }, [product]);
+
+  // =====================================================
+  // LOADING
+  // =====================================================
+
+  if (loading) {
+    return (
+      <div className="container">
+        <p>Loading product...</p>
+      </div>
+    );
+  }
+
+  // =====================================================
+  // PRODUCT NOT FOUND
+  // =====================================================
+
+  if (!product) {
+    return (
+      <Navigate
+        to="/404"
+        replace
+      />
+    );
+  }
+
+  const inWishlist =
+    isInWishlist(product.id);
+
+  const regularPrice =
+    Number(product.price || 0);
+
+  const discount =
+    Number(product.discount || 0);
+
+  const salePrice =
+    regularPrice -
+    (regularPrice * discount) / 100;
+
+  // =====================================================
   // SUBMIT REVIEW
   // =====================================================
 
@@ -546,6 +640,10 @@ if (
 
       setCanReview(false);
 
+      // The "already reviewed" message will also be recomputed by the
+      // review-eligibility effect once `reviews` updates above, but we
+      // set it immediately here too so the UI doesn't flash the old
+      // "you can review" state before that effect re-runs.
       setReviewMessage(
         "You have already reviewed this product."
       );
@@ -590,61 +688,69 @@ if (
   };
 
   // =====================================================
-  // LOADING
-  // =====================================================
-
-  if (loading) {
-    return (
-      <div className="container">
-        <p>Loading product...</p>
-      </div>
-    );
-  }
-
-  // =====================================================
-  // PRODUCT NOT FOUND
-  // =====================================================
-
-  if (!product) {
-    return (
-      <Navigate
-        to="/404"
-        replace
-      />
-    );
-  }
-
-  const inWishlist =
-    isInWishlist(product.id);
-
-  // =====================================================
   // ADD TO CART
   // =====================================================
 
   const handleAddToCart = () => {
-    if (product.stock <= 0) {
-      showToast(
-        "This product is out of stock.",
-        "error"
-      );
+  // =========================
+  // CHECK SELECTED VARIANT STOCK
+  // =========================
 
-      return;
-    }
+  const availableStock =
+    selectedVariant?.stock ?? product.stock ?? 0;
 
-    addToCart(
-      product,
-      quantity,
-      {
-        color,
-        size,
-      }
-    );
+  // =========================
+  // OUT OF STOCK
+  // =========================
 
+  if (availableStock <= 0) {
     showToast(
-      `${product.name} added to cart`,
-      "success"
+      selectedVariant
+        ? `${selectedVariant.color} is out of stock.`
+        : "This product is out of stock.",
+      "error"
     );
-  };
+
+    return;
+  }
+
+  // =========================
+  // QUANTITY EXCEEDS STOCK
+  // =========================
+
+  if (quantity > availableStock) {
+    showToast(
+      `Only ${availableStock} item${
+        availableStock !== 1 ? "s" : ""
+      } available.`,
+      "error"
+    );
+
+    return;
+  }
+
+  // =========================
+  // ADD TO CART
+  // =========================
+
+  addToCart(
+    product,
+    quantity,
+    {
+      color,
+      size,
+    }
+  );
+
+  // =========================
+  // SUCCESS
+  // =========================
+
+  showToast(
+    `${product.name} added to cart`,
+    "success"
+  );
+};
 
   // =====================================================
   // WISHLIST
@@ -698,43 +804,33 @@ if (
           <div className="product-main-image">
             <img
               src={
-                product.images[
-                  activeImage
-                ] ||
+                galleryImages[activeImage] ||
                 "https://via.placeholder.com/600x600?text=No+Image"
               }
               alt={product.name}
+              onClick={() => setIsImageZoomed(true)}
+              style={{
+                cursor: "zoom-in",
+              }}
             />
           </div>
 
-          {product.images.length >
-            0 && (
+          {galleryImages.length > 0 && (
             <div className="product-thumbnails">
-              {product.images.map(
-                (image, index) => (
-                  <button
-                    key={`${image}-${index}`}
-                    className={`product-thumb ${
-                      index ===
-                      activeImage
-                        ? "active"
-                        : ""
-                    }`}
-                    onClick={() =>
-                      setActiveImage(
-                        index
-                      )
-                    }
-                  >
-                    <img
-                      src={image}
-                      alt={`${product.name} ${
-                        index + 1
-                      }`}
-                    />
-                  </button>
-                )
-              )}
+              {galleryImages.map((image, index) => (
+                <button
+                  key={`${image}-${index}`}
+                  className={`product-thumb ${
+                    index === activeImage ? "active" : ""
+                  }`}
+                  onClick={() => setActiveImage(index)}
+                >
+                  <img
+                    src={image}
+                    alt={`${product.name} ${index + 1}`}
+                  />
+                </button>
+              ))}
             </div>
           )}
         </div>
@@ -769,14 +865,10 @@ if (
                 fontSize: "1.6rem",
               }}
             >
-              $
-              {Number(
-                product.price
-              ).toFixed(2)}
+              ${salePrice.toFixed(2)}
             </span>
 
-            {product.originalPrice >
-              product.price && (
+            {discount > 0 && (
               <>
                 <span
                   className="price-original"
@@ -784,33 +876,17 @@ if (
                     fontSize: "1.1rem",
                   }}
                 >
-                  $
-                  {Number(
-                    product.originalPrice
-                  ).toFixed(2)}
+                  ${regularPrice.toFixed(2)}
                 </span>
 
                 <span className="badge badge-sale">
-                  -{product.discount}%
+                  -{discount}%
                 </span>
               </>
             )}
           </div>
 
-          {/* Stock */}
-
-          <p
-            className={`stock-status ${
-              product.stock > 0
-                ? "in-stock"
-                : "out-stock"
-            }`}
-          >
-            {product.stock > 0
-              ? `In Stock (${product.stock} available)`
-              : "Out of Stock"}
-          </p>
-
+          
           {/* Description */}
 
           <p className="product-short-desc">
@@ -819,38 +895,69 @@ if (
 
           {/* Color */}
 
-          {product.colors?.length >
-            0 && (
-            <div className="option-group">
-              <span className="form-label">
-                Color: {color}
-              </span>
+{product.variants?.length > 0 && (
+  <div className="option-group">
+    <span className="form-label">
+      Color: {color}
+    </span>
 
-              <div className="option-row">
-                {product.colors.map(
-                  (item) => (
-                    <button
-                      key={item}
-                      className={`option-pill ${
-                        color ===
-                        item
-                          ? "active"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        setColor(
-                          item
-                        )
-                      }
-                    >
-                      {item}
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-          )}
+    <div className="option-row">
+      {product.variants.map(
+        (variant) => (
+          <button
+            key={variant.color}
+            type="button"
+            className={`option-pill ${
+              color === variant.color
+                ? "active"
+                : ""
+            }`}
+            onClick={() => {
+              setColor(
+                variant.color
+              );
 
+              setSelectedVariant(
+                variant
+              );
+
+              setActiveImage(0);
+
+              setQuantity(1);
+            }}
+          >
+            {variant.color}
+          </button>
+        )
+      )}
+    </div>
+
+    {/* Selected Color Stock */}
+
+    <p
+      className={`stock-status ${
+        (selectedVariant?.stock ??
+          product.stock ??
+          0) > 0
+          ? "in-stock"
+          : "out-stock"
+      }`}
+      style={{
+        marginTop: "10px",
+      }}
+    >
+      {(selectedVariant?.stock ??
+        product.stock ??
+        0) > 0
+        ? `In Stock (${
+            selectedVariant?.stock ??
+            product.stock ??
+            0
+          } available)`
+        : "Out of Stock"}
+    </p>
+  </div>
+)}
           {/* Size */}
 
           {product.sizes?.length >
@@ -887,55 +994,56 @@ if (
 
           {/* Quantity */}
 
-          <div className="option-group">
-            <span className="form-label">
-              Quantity
-            </span>
+<div className="option-group">
+  <span className="form-label">
+    Quantity
+  </span>
 
-            <div className="quantity-control">
-              <button
-                onClick={() =>
-                  setQuantity(
-                    (current) =>
-                      Math.max(
-                        1,
-                        current -
-                          1
-                      )
-                  )
-                }
-                aria-label="Decrease quantity"
-              >
-                <Minus size={14} />
-              </button>
+  <div className="quantity-control">
+    <button
+      onClick={() =>
+        setQuantity((current) =>
+          Math.max(1, current - 1)
+        )
+      }
+      aria-label="Decrease quantity"
+    >
+      <Minus size={14} />
+    </button>
 
-              <span>
-                {quantity}
-              </span>
+    <span>
+      {quantity}
+    </span>
 
-              <button
-                onClick={() =>
-                  setQuantity(
-                    (current) =>
-                      Math.min(
-                        product.stock,
-                        current +
-                          1
-                      )
-                  )
-                }
-                aria-label="Increase quantity"
-                disabled={
-                  product.stock ===
-                    0 ||
-                  quantity >=
-                    product.stock
-                }
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          </div>
+    <button
+      onClick={() => {
+        const availableStock =
+          selectedVariant?.stock ??
+          product.stock ??
+          0;
+
+        setQuantity((current) =>
+          Math.min(
+            availableStock,
+            current + 1
+          )
+        );
+      }}
+      aria-label="Increase quantity"
+      disabled={
+        (selectedVariant?.stock ??
+          product.stock ??
+          0) === 0 ||
+        quantity >=
+          (selectedVariant?.stock ??
+            product.stock ??
+            0)
+      }
+    >
+      <Plus size={14} />
+    </button>
+  </div>
+</div>
 
           {/* Actions */}
 
@@ -943,9 +1051,10 @@ if (
             <button
               className="btn btn-primary btn-lg"
               disabled={
-                product.stock ===
-                0
-              }
+  (selectedVariant?.stock ??
+    product.stock ??
+    0) <= 0
+}
               onClick={
                 handleAddToCart
               }
@@ -956,9 +1065,27 @@ if (
             <Link
               to="/checkout"
               className="btn btn-accent btn-lg"
-              onClick={
-                handleAddToCart
-              }
+              onClick={(event) => {
+  const availableStock =
+    selectedVariant?.stock ??
+    product.stock ??
+    0;
+
+  if (availableStock <= 0) {
+    event.preventDefault();
+
+    showToast(
+      selectedVariant
+        ? `${selectedVariant.color} is out of stock.`
+        : "This product is out of stock.",
+      "error"
+    );
+
+    return;
+  }
+
+  handleAddToCart();
+}}
             >
               Buy Now
             </Link>
@@ -1322,6 +1449,71 @@ if (
           )}
         </div>
       </div>
+
+      {isImageZoomed && (
+        <div
+          className="product-image-modal"
+          onClick={() =>
+            setIsImageZoomed(false)
+          }
+        >
+          <button
+            className="product-image-modal-close"
+            onClick={(event) => {
+              event.stopPropagation();
+              setIsImageZoomed(false);
+            }}
+            aria-label="Close image"
+          >
+            ×
+          </button>
+
+          {galleryImages.length > 1 && (
+            <>
+              <button
+                className="product-image-modal-prev"
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  setActiveImage((current) =>
+                    current === 0
+                      ? galleryImages.length - 1
+                      : current - 1
+                  );
+                }}
+                aria-label="Previous image"
+              >
+                ‹
+              </button>
+
+              <button
+                className="product-image-modal-next"
+                onClick={(event) => {
+                  event.stopPropagation();
+
+                  setActiveImage((current) =>
+                    current === galleryImages.length - 1
+                      ? 0
+                      : current + 1
+                  );
+                }}
+                aria-label="Next image"
+              >
+                ›
+              </button>
+            </>
+          )}
+
+          <img
+            src={galleryImages[activeImage]}
+            alt={product.name}
+            className="product-image-modal-image"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

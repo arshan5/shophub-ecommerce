@@ -220,27 +220,26 @@ export default function ProductCard({
 
         <div className="product-card-price">
 
-          <span className="price-current">
-            $
-            {Number(
-              product.price || 0
-            ).toFixed(2)}
-          </span>
+  <span className="price-current">
+    $
+    {(
+      Number(product.price || 0) -
+      (Number(product.price || 0) *
+        Number(product.discount || 0)) /
+        100
+    ).toFixed(2)}
+  </span>
 
-          {Number(
-            product.originalPrice || 0
-          ) > Number(
-            product.price || 0
-          ) && (
-            <span className="price-original">
-              $
-              {Number(
-                product.originalPrice
-              ).toFixed(2)}
-            </span>
-          )}
+  {Number(product.discount || 0) > 0 && (
+    <span className="price-original">
+      $
+      {Number(
+        product.price || 0
+      ).toFixed(2)}
+    </span>
+  )}
 
-        </div>
+</div>
       </div>
     </div>
   );

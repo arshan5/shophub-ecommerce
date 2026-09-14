@@ -3,6 +3,20 @@
   min-height: 100vh;
   background: var(--color-bg-soft);
 }
+.delete-order-btn {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  cursor: pointer;
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-order-btn:hover {
+  opacity: 0.75;
+}
 
 .admin-sidebar {
   width: 250px;

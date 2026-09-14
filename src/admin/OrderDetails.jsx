@@ -326,9 +326,12 @@ export default function OrderDetails() {
               >
                 <img
                   src={
-                    item.image ||
-                    "https://via.placeholder.com/56"
-                  }
+  item.image
+    ? item.image.startsWith("http")
+      ? item.image
+      : `${import.meta.env.VITE_API_URL}${item.image}`
+    : "https://via.placeholder.com/56"
+}
                   alt={item.name}
                   style={{
                     width: 56,

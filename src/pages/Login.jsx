@@ -1,6 +1,18 @@
-import { useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Eye, EyeOff } from "lucide-react";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  Link,
+  useNavigate,
+  useLocation,
+} from "react-router-dom";
+
+import {
+  Eye,
+  EyeOff,
+} from "lucide-react";
 
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
@@ -8,7 +20,11 @@ import { useToast } from "../context/ToastContext";
 import "./Auth.css";
 
 export default function Login() {
-  const { login } = useAuth();
+  const {
+    login,
+    loginWithGoogleToken,
+  } = useAuth();
+
   const { showToast } = useToast();
 
   const navigate = useNavigate();
@@ -21,19 +37,130 @@ export default function Login() {
   });
 
   const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
 
-  // Handle input changes
+  const [loading, setLoading] = useState(false);
+
+  const [googleLoading, setGoogleLoading] =
+    useState(false);
+
+  const [showPassword, setShowPassword] =
+    useState(false);
+
+  /*
+  =========================
+  GOOGLE LOGIN CALLBACK
+  =========================
+  */
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search
+    );
+
+    const token = params.get("token");
+    const googleError = params.get("google");
+
+    /*
+    Google authentication failed
+    */
+
+    if (googleError === "failed") {
+      showToast(
+        "Google login failed. Please try again.",
+        "error"
+      );
+
+      navigate("/login", {
+        replace: true,
+      });
+
+      return;
+    }
+
+    /*
+    No Google token
+    */
+
+    if (!token) {
+      return;
+    }
+
+    /*
+    Complete Google login
+    */
+
+    const handleGoogleLogin = async () => {
+      setGoogleLoading(true);
+
+      try {
+        await loginWithGoogleToken(token);
+
+        showToast(
+          "Logged in with Google successfully",
+          "success"
+        );
+
+        /*
+        Remove token from URL
+        */
+
+        const redirectTo =
+          location.state?.from ||
+          "/account";
+
+        navigate(redirectTo, {
+          replace: true,
+        });
+      } catch (error) {
+        console.error(
+          "Google login error:",
+          error
+        );
+
+        showToast(
+          error.message ||
+            "Google login failed.",
+          "error"
+        );
+
+        navigate("/login", {
+          replace: true,
+        });
+      } finally {
+        setGoogleLoading(false);
+      }
+    };
+
+    handleGoogleLogin();
+  }, [
+    loginWithGoogleToken,
+    navigate,
+    location.state,
+    showToast,
+  ]);
+
+  /*
+  =========================
+  HANDLE INPUT
+  =========================
+  */
+
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const {
+      name,
+      value,
+      type,
+      checked,
+    } = e.target;
 
     setForm({
       ...form,
-      [name]: type === "checkbox" ? checked : value,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : value,
     });
 
-    // Clear field error while typing
     setErrors({
       ...errors,
       [name]: "",
@@ -41,32 +168,56 @@ export default function Login() {
     });
   };
 
-  // Validate form
+  /*
+  =========================
+  VALIDATE FORM
+  =========================
+  */
+
   const validate = () => {
     const errs = {};
 
     if (!form.email.trim()) {
-      errs.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(form.email)) {
-      errs.email = "Enter a valid email";
+      errs.email =
+        "Email is required";
+    } else if (
+      !/\S+@\S+\.\S+/.test(
+        form.email
+      )
+    ) {
+      errs.email =
+        "Enter a valid email";
     }
 
     if (!form.password) {
-      errs.password = "Password is required";
-    } else if (form.password.length < 6) {
-      errs.password = "Password must be at least 6 characters";
+      errs.password =
+        "Password is required";
+    } else if (
+      form.password.length < 6
+    ) {
+      errs.password =
+        "Password must be at least 6 characters";
     }
 
     setErrors(errs);
 
-    return Object.keys(errs).length === 0;
+    return (
+      Object.keys(errs).length === 0
+    );
   };
 
-  // Login
+  /*
+  =========================
+  NORMAL LOGIN
+  =========================
+  */
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate()) {
+      return;
+    }
 
     setLoading(true);
 
@@ -76,16 +227,23 @@ export default function Login() {
         password: form.password,
       });
 
-      showToast("Logged in successfully", "success");
+      showToast(
+        "Logged in successfully",
+        "success"
+      );
 
-      // Return user to the page they originally wanted
-      const redirectTo = location.state?.from || "/account";
+      const redirectTo =
+        location.state?.from ||
+        "/account";
 
       navigate(redirectTo, {
         replace: true,
       });
     } catch (error) {
-      // User needs email verification
+      /*
+      User needs email verification
+      */
+
       if (
         error.status === 403 &&
         error.emailVerified === false
@@ -115,10 +273,34 @@ export default function Login() {
     }
   };
 
+  /*
+  =========================
+  GOOGLE LOGIN
+  =========================
+  */
+
+  const handleGoogleLogin = () => {
+    if (googleLoading) {
+      return;
+    }
+
+    window.location.href =
+      `${import.meta.env.VITE_API_URL}/api/auth/google`;
+  };
+
+  /*
+  =========================
+  UI
+  =========================
+  */
+
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Welcome Back</h1>
+
+        <h1>
+          Welcome Back
+        </h1>
 
         <p>
           Sign in to continue to your account
@@ -130,16 +312,60 @@ export default function Login() {
           </p>
         )}
 
-        <form onSubmit={handleSubmit} noValidate>
+        {/* =========================
+            GOOGLE LOGIN
+        ========================= */}
+
+        <button
+          type="button"
+          className="google-login-btn"
+          onClick={handleGoogleLogin}
+          disabled={
+            loading ||
+            googleLoading
+          }
+        >
+          <span className="google-icon">
+            G
+          </span>
+
+          {googleLoading
+            ? "Connecting..."
+            : "Continue with Google"}
+        </button>
+
+        {/* =========================
+            DIVIDER
+        ========================= */}
+
+        <div className="auth-divider">
+          <span>
+            OR
+          </span>
+        </div>
+
+        {/* =========================
+            LOGIN FORM
+        ========================= */}
+
+        <form
+          onSubmit={handleSubmit}
+          noValidate
+        >
+
           {/* Email */}
+
           <div className="form-group">
+
             <label className="form-label">
               Email Address
             </label>
 
             <input
               className={`form-control ${
-                errors.email ? "has-error" : ""
+                errors.email
+                  ? "has-error"
+                  : ""
               }`}
               name="email"
               type="email"
@@ -153,22 +379,29 @@ export default function Login() {
                 {errors.email}
               </p>
             )}
+
           </div>
 
           {/* Password */}
+
           <div className="form-group">
+
             <label className="form-label">
               Password
             </label>
 
             <div
               style={{
-                position: "relative",
+                position:
+                  "relative",
               }}
             >
+
               <input
                 className={`form-control ${
-                  errors.password ? "has-error" : ""
+                  errors.password
+                    ? "has-error"
+                    : ""
                 }`}
                 name="password"
                 type={
@@ -176,18 +409,25 @@ export default function Login() {
                     ? "text"
                     : "password"
                 }
-                value={form.password}
-                onChange={handleChange}
+                value={
+                  form.password
+                }
+                onChange={
+                  handleChange
+                }
                 placeholder="••••••••"
                 style={{
-                  paddingRight: "45px",
+                  paddingRight:
+                    "45px",
                 }}
               />
 
               <button
                 type="button"
                 onClick={() =>
-                  setShowPassword(!showPassword)
+                  setShowPassword(
+                    !showPassword
+                  )
                 }
                 aria-label={
                   showPassword
@@ -195,26 +435,36 @@ export default function Login() {
                     : "Show password"
                 }
                 style={{
-                  position: "absolute",
+                  position:
+                    "absolute",
                   right: "12px",
                   top: "50%",
                   transform:
                     "translateY(-50%)",
                   border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
+                  background:
+                    "transparent",
+                  cursor:
+                    "pointer",
                   padding: "4px",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  alignItems:
+                    "center",
+                  justifyContent:
+                    "center",
                 }}
               >
                 {showPassword ? (
-                  <EyeOff size={20} />
+                  <EyeOff
+                    size={20}
+                  />
                 ) : (
-                  <Eye size={20} />
+                  <Eye
+                    size={20}
+                  />
                 )}
               </button>
+
             </div>
 
             {errors.password && (
@@ -222,51 +472,72 @@ export default function Login() {
                 {errors.password}
               </p>
             )}
+
           </div>
 
-          {/* Remember + Forgot Password */}
+          {/* Remember + Forgot */}
+
           <div className="auth-options-row">
+
             <label className="checkbox-row">
+
               <input
                 type="checkbox"
                 name="remember"
-                checked={form.remember}
-                onChange={handleChange}
+                checked={
+                  form.remember
+                }
+                onChange={
+                  handleChange
+                }
               />
 
               Remember me
+
             </label>
 
             <Link
               to="/forgot-password"
               className="text-link"
               style={{
-                fontSize: "0.85rem",
+                fontSize:
+                  "0.85rem",
               }}
             >
               Forgot password?
             </Link>
+
           </div>
 
-          {/* Login Button */}
+          {/* Login button */}
+
           <button
             type="submit"
             className="btn btn-primary btn-block btn-lg"
-            disabled={loading}
+            disabled={
+              loading ||
+              googleLoading
+            }
           >
             {loading
               ? "Signing in..."
               : "Login"}
           </button>
+
         </form>
 
         {/* Register */}
+
         <p className="auth-footer-text">
+
           Don't have an account?{" "}
+
           <Link to="/register">
             Create one
           </Link>
+
         </p>
+
       </div>
     </div>
   );

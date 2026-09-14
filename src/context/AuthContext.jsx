@@ -209,6 +209,56 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+
+  /*
+=========================
+GOOGLE LOGIN
+=========================
+*/
+
+const loginWithGoogleToken = async (token) => {
+  if (!token) {
+    throw new Error("Google login token is missing.");
+  }
+
+  /*
+  Save JWT token
+  */
+  localStorage.setItem(
+    TOKEN_KEY,
+    token
+  );
+
+  /*
+  Get logged-in user
+  */
+  const response = await fetch(
+    `${API_URL}/api/auth/me`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    localStorage.removeItem(TOKEN_KEY);
+
+    throw new Error(
+      data.message ||
+        "Unable to complete Google login."
+    );
+  }
+
+  if (data.user) {
+    setUser(data.user);
+  }
+
+  return data;
+};
+
   /*
   =========================
   UPDATE PROFILE
@@ -350,12 +400,12 @@ export function AuthProvider({ children }) {
   */
 
   const value = {
-    user,
+  user,
+  isAuthenticated: !!user,
 
-    isAuthenticated: !!user,
-
-    login,
-    register,
+  login,
+  loginWithGoogleToken,
+  register,
 
     verifyEmail,
     resendVerificationCode,

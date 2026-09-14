@@ -22,10 +22,22 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    password: {
-      type: String,
-      required: true,
-    },
+password: {
+  type: String,
+  required: false,
+  default: null,
+},
+
+googleId: {
+  type: String,
+  default: null,
+},
+
+authProvider: {
+  type: String,
+  enum: ["local", "google"],
+  default: "local",
+},
 
     phone: {
       type: String,
@@ -37,16 +49,22 @@ const userSchema = new mongoose.Schema(
       default: "",
     },
 
-    role: {
-      type: String,
-      enum: ["customer", "admin"],
-      default: "customer",
-    },
+   role: {
+  type: String,
+  enum: ["customer", "admin"],
+  default: "customer",
+},
 
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
+status: {
+  type: String,
+  enum: ["Active", "Blocked"],
+  default: "Active",
+},
+
+isEmailVerified: {
+  type: Boolean,
+  default: false,
+},
 
     verificationCode: {
       type: String,

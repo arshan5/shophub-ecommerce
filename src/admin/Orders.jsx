@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye } from "lucide-react";
+import { Eye, Trash2 } from "lucide-react";
 
 import SearchBar from "../components/SearchBar";
 import { useToast } from "../context/ToastContext";
@@ -101,6 +101,61 @@ export default function Orders() {
     fetchOrders();
   }, [navigate, showToast]);
 
+
+
+
+
+  const handleDelete = async (orderId) => {
+  const confirmed = window.confirm(
+    "Are you sure you want to permanently delete this order?"
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const token =
+      localStorage.getItem("shophub_token");
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/orders/${orderId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Failed to delete order."
+      );
+    }
+
+    setOrders((prevOrders) =>
+      prevOrders.filter(
+        (order) => order._id !== orderId
+      )
+    );
+
+    showToast(
+      "Order deleted successfully.",
+      "success"
+    );
+  } catch (error) {
+    console.error(
+      "Delete order error:",
+      error
+    );
+
+    showToast(
+      error.message || "Failed to delete order.",
+      "error"
+    );
+  }
+};
   // =========================
   // FILTER ORDERS
   // =========================
@@ -320,13 +375,20 @@ export default function Orders() {
                       <td>
                         <div className="table-actions">
                           <Link
-                            to={`/admin/orders/${order._id}`}
-                            title="View"
-                          >
-                            <Eye
-                              size={14}
-                            />
-                          </Link>
+  to={`/admin/orders/${order._id}`}
+  title="View"
+>
+  <Eye size={14} />
+</Link>
+
+<button
+  type="button"
+  title="Delete"
+  onClick={() => handleDelete(order._id)}
+  className="delete-order-btn"
+>
+  <Trash2 size={14} />
+</button>
                         </div>
                       </td>
                     </tr>

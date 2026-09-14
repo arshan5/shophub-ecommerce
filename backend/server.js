@@ -1,6 +1,8 @@
 const dotenv = require("dotenv");
 
 dotenv.config();
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 const express = require("express");
 const mongoose = require("mongoose");
@@ -38,6 +40,87 @@ const PORT = 5000;
 
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL:
+        process.env.GOOGLE_CALLBACK_URL ||
+        "http://localhost:5000/api/auth/google/callback",
+    },
+
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const email =
+          profile.emails?.[0]?.value?.toLowerCase();
+
+        if (!email) {
+          return done(
+            new Error("Google account email not available.")
+          );
+        }
+
+        let user = await User.findOne({
+          email,
+        });
+
+        if (!user) {
+          user = await User.create({
+            firstName:
+              profile.name?.givenName || "Google",
+            lastName:
+              profile.name?.familyName || "User",
+            email,
+            password: null,
+            googleId: profile.id,
+            authProvider: "google",
+            avatar:
+              profile.photos?.[0]?.value || "",
+            isEmailVerified: true,
+            status: "Active",
+          });
+        } else {
+          user.googleId = profile.id;
+          user.authProvider = "google";
+
+          if (
+            profile.photos?.[0]?.value &&
+            !user.avatar
+          ) {
+            user.avatar =
+              profile.photos[0].value;
+          }
+
+          user.isEmailVerified = true;
+
+          await user.save();
+        }
+
+        return done(null, user);
+      } catch (error) {
+        console.error(
+          "Google authentication error:",
+          error
+        );
+
+        return done(error, null);
+      }
+    }
+  )
+);
+
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    res.status(500).json({
+      message: "Database connection failed.",
+    });
+  }
+});
 
 
 // =========================
@@ -79,7 +162,41 @@ const authMiddleware = (req, res, next) => {
   }
 };
 
+// =========================
+// GET CURRENT USER
+// AUTHENTICATED USER
+// =========================
 
+app.get(
+  "/api/auth/me",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const user = await User.findById(
+        req.user.id
+      ).select("-password");
+
+      if (!user) {
+        return res.status(404).json({
+          message: "User not found.",
+        });
+      }
+
+      res.json({
+        user,
+      });
+    } catch (error) {
+      console.error(
+        "Get current user error:",
+        error
+      );
+
+      res.status(500).json({
+        message: "Failed to fetch user.",
+      });
+    }
+  }
+);
 // =========================
 // ADMIN MIDDLEWARE
 // =========================
@@ -2054,7 +2171,9 @@ Shop<span style="color:#6366f1;">Hub</span>
 );
 
 
+// =========================
 // FORGOT PASSWORD
+// =========================
 
 app.post(
   "/api/auth/forgot-password",
@@ -2064,18 +2183,16 @@ app.post(
 
       if (!email) {
         return res.status(400).json({
-          message:
-            "Email is required.",
+          message: "Email is required.",
         });
       }
 
       const normalizedEmail =
         email.trim().toLowerCase();
 
-      const user =
-        await User.findOne({
-          email: normalizedEmail,
-        });
+      const user = await User.findOne({
+        email: normalizedEmail,
+      });
 
       if (!user) {
         return res.json({
@@ -2084,35 +2201,41 @@ app.post(
         });
       }
 
-      const resetToken =
-        generateResetToken();
+      const resetToken = generateResetToken();
 
-      const resetTokenExpires =
-        new Date(
-          Date.now() +
-            15 * 60 * 1000
-        );
+      const resetTokenExpires = new Date(
+        Date.now() + 15 * 60 * 1000
+      );
 
-      user.resetPasswordToken =
-        resetToken;
-
-      user.resetPasswordExpires =
-        resetTokenExpires;
+      user.resetPasswordToken = resetToken;
+      user.resetPasswordExpires = resetTokenExpires;
 
       await user.save();
 
+      // LOCAL + LIVE FRONTEND URL
+      const frontendUrl =
+  process.env.FRONTEND_URL ||
+  "http://localhost:5173";
+
+const session = await stripe.checkout.sessions.create({
+  // ...
+
+  success_url:
+    `${frontendUrl}/order-success?session_id={CHECKOUT_SESSION_ID}`,
+
+  cancel_url:
+    `${frontendUrl}/checkout`,
+});
+
       const resetUrl =
-        `http://localhost:5173/reset-password?token=${resetToken}`;
+        `${frontendUrl}/reset-password?token=${resetToken}`;
 
       const html = `
 <!DOCTYPE html>
 <html>
 <head>
 <meta charset="UTF-8">
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1.0"
->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reset Your ShopHub Password</title>
 </head>
 
@@ -2124,7 +2247,6 @@ font-family:Arial,Helvetica,sans-serif;
 ">
 
 <table width="100%" cellpadding="0" cellspacing="0">
-
 <tr>
 <td align="center" style="padding:40px 15px;">
 
@@ -2271,7 +2393,6 @@ Thank you for choosing ShopHub.
 
 </td>
 </tr>
-
 </table>
 
 </body>
@@ -2290,11 +2411,8 @@ Thank you for choosing ShopHub.
           emailError
         );
 
-        user.resetPasswordToken =
-          null;
-
-        user.resetPasswordExpires =
-          null;
+        user.resetPasswordToken = null;
+        user.resetPasswordExpires = null;
 
         await user.save();
 
@@ -2399,7 +2517,57 @@ app.post(
   }
 );
 
+// =========================
+// GOOGLE LOGIN
+// =========================
 
+app.get(
+  "/api/auth/google",
+  passport.authenticate("google", {
+    scope: ["profile", "email"],
+  })
+);
+
+app.get(
+  "/api/auth/google/callback",
+  passport.authenticate("google", {
+    session: false,
+    failureRedirect:
+      `${process.env.FRONTEND_URL}/login?google=failed`,
+  }),
+  async (req, res) => {
+    try {
+      const token = jwt.sign(
+        {
+          id: req.user._id,
+          email: req.user.email,
+          role: req.user.role,
+        },
+        process.env.JWT_SECRET,
+        {
+          expiresIn: "7d",
+        }
+      );
+
+      const frontendUrl =
+        process.env.FRONTEND_URL ||
+        "http://localhost:5173";
+
+      res.redirect(
+        `${frontendUrl}/login?token=${token}`
+      );
+    } catch (error) {
+      console.error(
+        "Google login callback error:",
+        error
+      );
+
+      res.redirect(
+        `${process.env.FRONTEND_URL}/login?google=failed`
+      );
+    }
+  }
+);
 // LOGIN
 
 app.post(
@@ -2566,15 +2734,15 @@ app.get(
                   "",
 
                 role:
-                  user.role ||
-                  "customer",
+  user.role ||
+  "customer",
 
-                isEmailVerified:
-                  user.isEmailVerified ||
-                  false,
+status:
+  user.status || "Active",
 
-                status:
-                  "Active",
+isEmailVerified:
+  user.isEmailVerified ||
+  false,
 
                 ordersCount,
 
@@ -2601,7 +2769,114 @@ app.get(
   }
 );
 
+// UPDATE USER STATUS
+// ADMIN ONLY
 
+app.put(
+  "/api/auth/users/:id/status",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const { status } = req.body;
+
+      if (!["Active", "Blocked"].includes(status)) {
+        return res.status(400).json({
+          message: "Invalid user status.",
+        });
+      }
+
+      const user = await User.findById(req.params.id);
+
+      if (!user) {
+        return res.status(404).json({
+          message: "User not found.",
+        });
+      }
+
+      // Do not allow blocking an admin
+      if (user.role === "admin") {
+        return res.status(403).json({
+          message: "Admin account cannot be blocked.",
+        });
+      }
+
+      user.status = status;
+
+      await user.save();
+
+      res.json({
+        message: `User ${status.toLowerCase()} successfully.`,
+        user: {
+          _id: user._id,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          email: user.email,
+          status: user.status,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "Update user status error:",
+        error
+      );
+
+      res.status(500).json({
+        message: "Failed to update user status.",
+      });
+    }
+  }
+);
+
+// DELETE USER
+// ADMIN ONLY
+
+app.delete(
+  "/api/auth/users/:id",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const user =
+        await User.findById(
+          req.params.id
+        );
+
+      if (!user) {
+        return res.status(404).json({
+          message: "User not found.",
+        });
+      }
+
+      // Do not allow deleting an admin
+      if (user.role === "admin") {
+        return res.status(403).json({
+          message:
+            "Admin account cannot be deleted.",
+        });
+      }
+
+      await User.findByIdAndDelete(
+        req.params.id
+      );
+
+      res.json({
+        message:
+          "User deleted successfully.",
+      });
+    } catch (error) {
+      console.error(
+        "Delete user error:",
+        error
+      );
+
+      res.status(500).json({
+        message:
+          "Failed to delete user.",
+      });
+    }
+  }
+);
 // CHANGE PASSWORD
 
 app.put(
@@ -3045,7 +3320,105 @@ app.get(
   }
 );
 
+// =========================
+// GET NEW ARRIVALS
+// PUBLIC
+// =========================
 
+app.get(
+  "/api/products/new-arrivals",
+  async (req, res) => {
+    try {
+      const products =
+        await Product.find()
+          .sort({ _id: -1 })
+          .limit(8);
+
+      res.json(products);
+    } catch (error) {
+      console.error(
+        "New arrivals error:",
+        error
+      );
+
+      res.status(500).json({
+        message:
+          "Failed to fetch new arrivals.",
+      });
+    }
+  }
+);
+
+
+// =========================
+// GET BEST SELLERS
+// PUBLIC
+// =========================
+
+app.get(
+  "/api/products/best-sellers",
+  async (req, res) => {
+    try {
+      const bestSellers =
+        await Order.aggregate([
+          {
+            $unwind: "$items",
+          },
+          {
+            $group: {
+              _id: "$items.productId",
+              totalSold: {
+                $sum: "$items.quantity",
+              },
+            },
+          },
+          {
+            $sort: {
+              totalSold: -1,
+            },
+          },
+          {
+            $limit: 8,
+          },
+        ]);
+
+      const productIds =
+        bestSellers.map(
+          (item) => item._id
+        );
+
+      const products =
+        await Product.find({
+          _id: {
+            $in: productIds,
+          },
+        });
+
+      const sortedProducts =
+        productIds
+          .map((id) =>
+            products.find(
+              (product) =>
+                product._id.toString() ===
+                id.toString()
+            )
+          )
+          .filter(Boolean);
+
+      res.json(sortedProducts);
+    } catch (error) {
+      console.error(
+        "Best sellers error:",
+        error
+      );
+
+      res.status(500).json({
+        message:
+          "Failed to fetch best sellers.",
+      });
+    }
+  }
+);
 // GET SINGLE PRODUCT
 // PUBLIC
 
@@ -3081,48 +3454,131 @@ app.get(
 // CREATE PRODUCT
 // ADMIN ONLY
 
+// =========================
+// CREATE PRODUCT
+// ADMIN ONLY
+// =========================
+
 app.post(
   "/api/products",
   authMiddleware,
   adminMiddleware,
-  upload.single("image"),
+  upload.any(),
   async (req, res) => {
     try {
       const {
         name,
         price,
+        discount,
         description,
         category,
         stock,
+        variantCount,
       } = req.body;
 
-      const product =
-        new Product({
-          name,
+      // =========================
+      // MAIN PRODUCT IMAGES
+      // =========================
 
-          price:
-            Number(price),
+      const uploadedImages = (
+        req.files || []
+      )
+        .filter(
+          (file) =>
+            file.fieldname === "images"
+        )
+        .map(
+          (file) =>
+            `/uploads/${file.filename}`
+        );
 
-          description,
+      // =========================
+      // COLOR VARIANTS
+      // =========================
 
-          category,
+      const variants = [];
 
-          stock:
-            Number(stock),
+      const totalVariants =
+        Number(variantCount) || 0;
 
-          image:
-            req.file
-              ? `/uploads/${req.file.filename}`
-              : "",
-        });
+      for (
+        let index = 0;
+        index < totalVariants;
+        index++
+      ) {
+        const color =
+          req.body[
+            `variantColor_${index}`
+          ];
+
+        const variantStock =
+          Number(
+            req.body[
+              `variantStock_${index}`
+            ]
+          ) || 0;
+
+        const variantImages = (
+          req.files || []
+        )
+          .filter(
+            (file) =>
+              file.fieldname ===
+              `variantImages_${index}`
+          )
+          .map(
+            (file) =>
+              `/uploads/${file.filename}`
+          );
+
+        if (color) {
+          variants.push({
+            color: color.trim(),
+
+            stock: variantStock,
+
+            images: variantImages,
+          });
+        }
+      }
+
+      // =========================
+      // CREATE PRODUCT
+      // =========================
+
+      const product = new Product({
+        name,
+
+        price: Number(price),
+
+        discount:
+          Number(discount) || 0,
+
+        description,
+
+        category,
+
+        stock: Number(stock) || 0,
+
+        // First main image
+        image:
+          uploadedImages[0] || "",
+
+        // Main product gallery
+        images: uploadedImages,
+
+        // Color variants
+        variants,
+      });
 
       await product.save();
 
-      res.status(201).json(
-        product
-      );
+      res.status(201).json(product);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Create product error:",
+        error
+      );
 
       res.status(500).json({
         message:
@@ -3133,14 +3589,16 @@ app.post(
 );
 
 
+// =========================
 // UPDATE PRODUCT
 // ADMIN ONLY
+// =========================
 
 app.put(
   "/api/products/:id",
   authMiddleware,
   adminMiddleware,
-  upload.single("image"),
+  upload.any(),
   async (req, res) => {
     try {
       const product =
@@ -3158,16 +3616,24 @@ app.put(
       const {
         name,
         price,
+        discount,
         description,
         category,
         stock,
+        variantCount,
       } = req.body;
 
-      product.name =
-        name;
+      // =========================
+      // BASIC PRODUCT DETAILS
+      // =========================
+
+      product.name = name;
 
       product.price =
         Number(price);
+
+      product.discount =
+        Number(discount) || 0;
 
       product.description =
         description;
@@ -3176,41 +3642,148 @@ app.put(
         category;
 
       product.stock =
-        Number(stock);
+        Number(stock) || 0;
 
-      if (req.file) {
-        if (product.image) {
-          const oldImagePath =
-            path.join(
-              __dirname,
-              product.image.replace(
-                "/uploads/",
-                "uploads/"
-              )
-            );
+      // =========================
+      // NORMAL PRODUCT IMAGES
+      // =========================
 
-          if (
-            fs.existsSync(
-              oldImagePath
-            )
-          ) {
-            fs.unlinkSync(
-              oldImagePath
-            );
-          }
+      const newImages = (
+        req.files || []
+      )
+        .filter(
+          (file) =>
+            file.fieldname === "images"
+        )
+        .map(
+          (file) =>
+            `/uploads/${file.filename}`
+        );
+
+      if (newImages.length > 0) {
+        product.images = [
+          ...(product.images || []),
+          ...newImages,
+        ];
+
+        if (!product.image) {
+          product.image =
+            newImages[0];
+        }
+      }
+
+      // =========================
+      // COLOR VARIANTS
+      // =========================
+
+      const variants = [];
+
+      const totalVariants =
+        Number(variantCount) || 0;
+
+      for (
+        let index = 0;
+        index < totalVariants;
+        index++
+      ) {
+        const color =
+          req.body[
+            `variantColor_${index}`
+          ];
+
+        if (!color) {
+          continue;
         }
 
-        product.image =
-          `/uploads/${req.file.filename}`;
+        // =========================
+        // VARIANT STOCK
+        // =========================
+
+        const variantStock =
+          Number(
+            req.body[
+              `variantStock_${index}`
+            ]
+          ) || 0;
+
+        // =========================
+        // EXISTING IMAGES
+        // =========================
+
+        let existingImages =
+          req.body[
+            `variantImages_${index}`
+          ];
+
+        if (!existingImages) {
+          existingImages = [];
+        }
+
+        if (
+          !Array.isArray(
+            existingImages
+          )
+        ) {
+          existingImages = [
+            existingImages,
+          ];
+        }
+
+        // =========================
+        // NEW UPLOADED IMAGES
+        // =========================
+
+        const newVariantImages = (
+          req.files || []
+        )
+          .filter(
+            (file) =>
+              file.fieldname ===
+              `variantImages_${index}`
+          )
+          .map(
+            (file) =>
+              `/uploads/${file.filename}`
+          );
+
+        // =========================
+        // COMBINE IMAGES
+        // =========================
+
+        const allVariantImages = [
+          ...existingImages,
+          ...newVariantImages,
+        ];
+
+        // =========================
+        // SAVE VARIANT
+        // =========================
+
+        variants.push({
+          color: color.trim(),
+
+          stock: variantStock,
+
+          images:
+            allVariantImages,
+        });
       }
+
+      product.variants =
+        variants;
+
+      // =========================
+      // SAVE PRODUCT
+      // =========================
 
       await product.save();
 
-      res.json(
-        product
-      );
+      res.json(product);
     } catch (error) {
-      console.error(error);
+      console.error(
+        "Update product error:",
+        error
+      );
 
       res.status(500).json({
         message:
@@ -3219,8 +3792,6 @@ app.put(
     }
   }
 );
-
-
 // DELETE PRODUCT
 // ADMIN ONLY
 
@@ -3292,6 +3863,10 @@ app.delete(
 // CUSTOMER
 
 
+// =========================
+// CREATE ORDER
+// =========================
+
 app.post(
   "/api/orders",
   async (req, res) => {
@@ -3299,13 +3874,225 @@ app.post(
       const orderData =
         req.body;
 
+      const updatedStockItems = [];
+
+      // =========================
+      // CHECK & UPDATE PRODUCT STOCK
+      // =========================
+
+      for (const item of orderData.items) {
+        const quantity =
+          Number(item.quantity) || 0;
+
+        if (quantity <= 0) {
+          return res.status(400).json({
+            message: `Invalid quantity for ${item.name}.`,
+          });
+        }
+
+        // =========================
+        // COLOR VARIANT STOCK
+        // =========================
+
+        if (item.color) {
+          const product =
+            await Product.findOneAndUpdate(
+              {
+                _id: item.productId,
+
+                variants: {
+                  $elemMatch: {
+                    color: item.color,
+                    stock: {
+                      $gte: quantity,
+                    },
+                  },
+                },
+              },
+              {
+                $inc: {
+                  "variants.$.stock":
+                    -quantity,
+                },
+              },
+              {
+                new: true,
+              }
+            );
+
+          // =========================
+          // VARIANT STOCK NOT AVAILABLE
+          // =========================
+
+          if (!product) {
+            // =========================
+            // ROLLBACK PREVIOUS STOCK
+            // =========================
+
+            for (
+              const updatedItem of
+              updatedStockItems
+            ) {
+              if (
+                updatedItem.color
+              ) {
+                await Product.updateOne(
+                  {
+                    _id:
+                      updatedItem.productId,
+
+                    "variants.color":
+                      updatedItem.color,
+                  },
+                  {
+                    $inc: {
+                      "variants.$.stock":
+                        updatedItem.quantity,
+                    },
+                  }
+                );
+              } else {
+                await Product.updateOne(
+                  {
+                    _id:
+                      updatedItem.productId,
+                  },
+                  {
+                    $inc: {
+                      stock:
+                        updatedItem.quantity,
+                    },
+                  }
+                );
+              }
+            }
+
+            return res.status(400).json({
+              message:
+                `Not enough ${item.color} stock available for ${item.name}.`,
+            });
+          }
+
+          // =========================
+          // REMEMBER UPDATED STOCK
+          // FOR POSSIBLE ROLLBACK
+          // =========================
+
+          updatedStockItems.push({
+            productId:
+              item.productId,
+
+            color:
+              item.color,
+
+            quantity,
+          });
+        }
+
+        // =========================
+        // NORMAL PRODUCT STOCK
+        // =========================
+
+        else {
+          const product =
+            await Product.findOneAndUpdate(
+              {
+                _id: item.productId,
+
+                stock: {
+                  $gte: quantity,
+                },
+              },
+              {
+                $inc: {
+                  stock:
+                    -quantity,
+                },
+              },
+              {
+                new: true,
+              }
+            );
+
+          // =========================
+          // PRODUCT STOCK NOT AVAILABLE
+          // =========================
+
+          if (!product) {
+            // =========================
+            // ROLLBACK PREVIOUS STOCK
+            // =========================
+
+            for (
+              const updatedItem of
+              updatedStockItems
+            ) {
+              if (
+                updatedItem.color
+              ) {
+                await Product.updateOne(
+                  {
+                    _id:
+                      updatedItem.productId,
+
+                    "variants.color":
+                      updatedItem.color,
+                  },
+                  {
+                    $inc: {
+                      "variants.$.stock":
+                        updatedItem.quantity,
+                    },
+                  }
+                );
+              } else {
+                await Product.updateOne(
+                  {
+                    _id:
+                      updatedItem.productId,
+                  },
+                  {
+                    $inc: {
+                      stock:
+                        updatedItem.quantity,
+                    },
+                  }
+                );
+              }
+            }
+
+            return res.status(400).json({
+              message:
+                `Not enough stock available for ${item.name}.`,
+            });
+          }
+
+          // =========================
+          // REMEMBER UPDATED STOCK
+          // FOR POSSIBLE ROLLBACK
+          // =========================
+
+          updatedStockItems.push({
+            productId:
+              item.productId,
+
+            color: "",
+
+            quantity,
+          });
+        }
+      }
+
+      // =========================
+      // CREATE ORDER
+      // =========================
+
       const order =
         new Order(
           orderData
         );
 
       await order.save();
-
 
       // =========================
       // ADMIN EMAIL
@@ -3372,7 +4159,6 @@ app.post(
         );
       }
 
-
       // =========================
       // CUSTOMER EMAIL
       // =========================
@@ -3438,6 +4224,10 @@ app.post(
         );
       }
 
+      // =========================
+      // SUCCESS RESPONSE
+      // =========================
+
       res.status(201).json({
         message:
           "Order created successfully.",
@@ -3458,6 +4248,27 @@ app.post(
   }
 );
 
+app.get(
+  "/api/orders/my-orders",
+  authMiddleware,
+  async (req, res) => {
+    try {
+      const orders = await Order.find({
+        "customer.email": req.user.email,
+      }).sort({
+        createdAt: -1,
+      });
+
+      res.json(orders);
+    } catch (error) {
+      console.error("Get customer orders error:", error);
+
+      res.status(500).json({
+        message: "Failed to fetch your orders.",
+      });
+    }
+  }
+);
 
 // GET ALL ORDERS
 // ADMIN ONLY
@@ -3539,7 +4350,41 @@ app.get(
   }
 );
 
+// DELETE ORDER
+// ADMIN ONLY
 
+app.delete(
+  "/api/orders/:id",
+  authMiddleware,
+  adminMiddleware,
+  async (req, res) => {
+    try {
+      const order =
+        await Order.findByIdAndDelete(
+          req.params.id
+        );
+
+      if (!order) {
+        return res.status(404).json({
+          message: "Order not found.",
+        });
+      }
+
+      res.json({
+        message: "Order deleted successfully.",
+      });
+    } catch (error) {
+      console.error(
+        "Delete order error:",
+        error
+      );
+
+      res.status(500).json({
+        message: "Failed to delete order.",
+      });
+    }
+  }
+);
 // UPDATE ORDER STATUS
 // ADMIN ONLY
 
@@ -3579,7 +4424,31 @@ app.put(
 
       await order.save();
 
+// =========================
+// UPDATE PRODUCT STOCK
+// =========================
 
+for (const item of order.items) {
+  const product = await Product.findById(
+    item.productId
+  );
+
+  if (!product) {
+    console.error(
+      `Product not found: ${item.productId}`
+    );
+    continue;
+  }
+
+  product.stock =
+    Math.max(
+      0,
+      Number(product.stock || 0) -
+        Number(item.quantity || 0)
+    );
+
+  await product.save();
+}
       // =========================
       // SEND STATUS EMAIL
       // =========================
@@ -4210,7 +5079,8 @@ app.get(
     }
   }
 );
-app.post(
+ console.log("STRIPE FRONTEND URL:", process.env.FRONTEND_URL);
+ app.post(
   "/api/stripe/create-checkout-session",
   authMiddleware,
   async (req, res) => {
@@ -4253,11 +5123,11 @@ app.post(
           total: String(total),
         },
 
-        success_url:
-          "http://localhost:5173/order-success?session_id={CHECKOUT_SESSION_ID}",
+       success_url:
+  `${process.env.FRONTEND_URL || "http://localhost:5173"}/order-success?session_id={CHECKOUT_SESSION_ID}`,
 
-        cancel_url:
-          "http://localhost:5173/checkout",
+cancel_url:
+  `${process.env.FRONTEND_URL || "http://localhost:5173"}/checkout`,
       });
 
       res.json({
@@ -4272,25 +5142,7 @@ app.post(
     }
   }
 );
-// =========================
-// MONGODB
-// =========================
 
-mongoose
-  .connect(
-    process.env.MONGO_URI
-  )
-  .then(() => {
-    console.log(
-      "MongoDB connected"
-    );
-  })
-  .catch((error) => {
-    console.error(
-      "MongoDB connection error:",
-      error
-    );
-  });
 
 
 // =========================
@@ -4310,7 +5162,8 @@ app.get(
 // =========================
 // START SERVER
 // =========================
-
+console.log("LIVE EMAIL_USER:", !!process.env.EMAIL_USER);
+console.log("LIVE EMAIL_PASS:", !!process.env.EMAIL_PASS);
 console.log(
   "SERVER FILE:",
   __filename
@@ -4328,29 +5181,50 @@ console.log(
   "ADMIN AUTH MIDDLEWARE LOADED"
 );
 
-app.listen(
-  PORT,
-  () => {
+// =========================
+// MONGODB
+// =========================
+
+let mongoConnection = null;
+
+const connectDB = async () => {
+  if (mongoose.connection.readyState === 1) {
+    return;
+  }
+
+  if (!mongoConnection) {
+    mongoConnection = mongoose
+      .connect(process.env.MONGO_URI)
+      .then(() => {
+        console.log("MongoDB connected");
+      })
+      .catch((error) => {
+        mongoConnection = null;
+        console.error("MongoDB connection error:", error);
+        throw error;
+      });
+  }
+
+  await mongoConnection;
+};
+
+
+// =========================
+// LOCAL SERVER
+// =========================
+
+if (require.main === module) {
+  app.listen(PORT, () => {
     console.log(
       `Server running on http://localhost:${PORT}`
     );
-  }
-);
-
-
-
-
-
-const seedCatalog = require("./config/seedCatalog");
-
-
-
-connectDB().then(async () => {
-  await seedCatalog();
-
-  app.listen(5000, () => {
-    console.log("Server running on port 5000");
   });
-});
+}
+// =========================
+// VERCEL EXPORT
+// =========================
+
+module.exports = app;
+
 
 

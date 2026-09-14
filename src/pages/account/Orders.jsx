@@ -30,8 +30,7 @@ export default function Orders() {
         const token = localStorage.getItem("shophub_token");
 
         const response = await fetch(
-          `${API_URL}/api/orders`,
-          {
+`${API_URL}/api/orders/my-orders`,          {
             headers: token
               ? {
                   Authorization: `Bearer ${token}`,

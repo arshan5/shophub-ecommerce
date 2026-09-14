@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Eye } from "lucide-react";
+import { Eye, Ban, Trash2 } from "lucide-react";
 
 import SearchBar from "../components/SearchBar";
 import Modal from "../components/Modal";
@@ -9,10 +9,8 @@ import "./Admin.css";
 export default function Users() {
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState("");
-  const [selectedUser, setSelectedUser] =
-    useState(null);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const { showToast } = useToast();
@@ -25,9 +23,7 @@ export default function Users() {
     const fetchUsers = async () => {
       try {
         const token =
-          localStorage.getItem(
-            "shophub_token"
-          );
+          localStorage.getItem("shophub_token");
 
         if (!token) {
           showToast(
@@ -67,8 +63,7 @@ export default function Users() {
             "error"
           );
 
-          window.location.href =
-            "/account";
+          window.location.href = "/account";
 
           return;
         }
@@ -100,6 +95,167 @@ export default function Users() {
 
     fetchUsers();
   }, [showToast]);
+
+  // =========================
+  // BLOCK / UNBLOCK USER
+  // =========================
+
+  const handleToggleStatus = async (user) => {
+    const newStatus =
+      user.status === "Blocked"
+        ? "Active"
+        : "Blocked";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${
+        newStatus === "Blocked"
+          ? "block"
+          : "unblock"
+      } this user?`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const token =
+        localStorage.getItem(
+          "shophub_token"
+        );
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/users/${user._id}/status`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type":
+              "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            status: newStatus,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to update user status."
+        );
+      }
+
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u._id === user._id
+            ? {
+                ...u,
+                status: newStatus,
+              }
+            : u
+        )
+      );
+
+      // Update modal user if open
+      if (
+        selectedUser &&
+        selectedUser._id === user._id
+      ) {
+        setSelectedUser((prev) => ({
+          ...prev,
+          status: newStatus,
+        }));
+      }
+
+      showToast(
+        `User ${
+          newStatus === "Blocked"
+            ? "blocked"
+            : "unblocked"
+        } successfully.`,
+        "success"
+      );
+    } catch (error) {
+      console.error(
+        "Update user status error:",
+        error
+      );
+
+      showToast(
+        error.message ||
+          "Failed to update user status.",
+        "error"
+      );
+    }
+  };
+
+  // =========================
+  // DELETE USER
+  // =========================
+
+  const handleDeleteUser = async (
+    userId
+  ) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this user?"
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const token =
+        localStorage.getItem(
+          "shophub_token"
+        );
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/auth/users/${userId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            "Failed to delete user."
+        );
+      }
+
+      setUsers((prevUsers) =>
+        prevUsers.filter(
+          (user) =>
+            user._id !== userId
+        )
+      );
+
+      setSelectedUser(null);
+
+      showToast(
+        "User deleted successfully.",
+        "success"
+      );
+    } catch (error) {
+      console.error(
+        "Delete user error:",
+        error
+      );
+
+      showToast(
+        error.message ||
+          "Failed to delete user.",
+        "error"
+      );
+    }
+  };
 
   // =========================
   // FILTER USERS
@@ -229,6 +385,12 @@ export default function Users() {
                     u.lastName || ""
                   }`.trim();
 
+                const isAdmin =
+                  u.role === "admin";
+
+                const isBlocked =
+                  u.status === "Blocked";
+
                 return (
                   <tr key={u._id}>
                     <td>
@@ -292,7 +454,9 @@ export default function Users() {
 
                     <td>
                       <div className="table-actions">
+                        {/* VIEW */}
                         <button
+                          type="button"
                           title="View"
                           onClick={() =>
                             setSelectedUser(
@@ -304,6 +468,44 @@ export default function Users() {
                             size={14}
                           />
                         </button>
+
+                        {/* BLOCK / UNBLOCK */}
+                        {!isAdmin && (
+                          <button
+                            type="button"
+                            title={
+                              isBlocked
+                                ? "Unblock"
+                                : "Block"
+                            }
+                            onClick={() =>
+                              handleToggleStatus(
+                                u
+                              )
+                            }
+                          >
+                            <Ban
+                              size={14}
+                            />
+                          </button>
+                        )}
+
+                        {/* DELETE */}
+                        {!isAdmin && (
+                          <button
+                            type="button"
+                            title="Delete"
+                            onClick={() =>
+                              handleDeleteUser(
+                                u._id
+                              )
+                            }
+                          >
+                            <Trash2
+                              size={14}
+                            />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -346,6 +548,14 @@ export default function Users() {
                   selectedUser.lastName ||
                   ""
                 }`.trim();
+
+              const isAdmin =
+                selectedUser.role ===
+                "admin";
+
+              const isBlocked =
+                selectedUser.status ===
+                "Blocked";
 
               return (
                 <>
@@ -457,6 +667,51 @@ export default function Users() {
                         "-"}
                     </span>
                   </div>
+
+                  {/* MODAL ACTIONS */}
+                  {!isAdmin && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: 10,
+                        marginTop: 24,
+                      }}
+                    >
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() =>
+                          handleToggleStatus(
+                            selectedUser
+                          )
+                        }
+                      >
+                        <Ban
+                          size={14}
+                        />
+
+                        {isBlocked
+                          ? "Unblock User"
+                          : "Block User"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-danger"
+                        onClick={() =>
+                          handleDeleteUser(
+                            selectedUser._id
+                          )
+                        }
+                      >
+                        <Trash2
+                          size={14}
+                        />
+
+                        Delete User
+                      </button>
+                    </div>
+                  )}
                 </>
               );
             })()}

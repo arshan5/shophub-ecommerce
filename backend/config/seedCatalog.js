@@ -1,3 +1,5 @@
+
+
 const Product = require("../models/Product");
 
 const seedCatalog = async () => {

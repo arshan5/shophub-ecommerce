@@ -90,24 +90,43 @@ export default function EditProduct() {
 
   const initialProduct = {
     _id: product._id,
-    name: product.name || "",
+
+    name:
+      product.name || "",
+
     category:
       product.category || "",
+
     description:
       product.description || "",
-    price: product.price ?? "",
+
+    price:
+      product.price ?? "",
+
     discount:
       product.discount ?? "",
-    stock: product.stock ?? "",
+
+    stock:
+      product.stock ?? "",
+
     rating:
       product.rating ?? "",
+
     featured:
       product.featured || false,
+
     status:
       product.status ||
       (product.stock > 0
         ? "Active"
         : "Draft"),
+
+    variants: Array.isArray(
+      product.variants
+    )
+      ? product.variants
+      : [],
+
     image:
       product.image || "",
   };
