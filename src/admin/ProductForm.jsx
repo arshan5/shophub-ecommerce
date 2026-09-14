@@ -1464,16 +1464,16 @@ formData.append(
                         }}
                       >
                         <img
-                          src={
-                            image.startsWith(
-                              "http"
-                            )
-                              ? image
-                              : `${import.meta.env.VITE_API_URL}${image}`
-                          }
-                          alt={`${variant.color} ${
-                            imageIndex + 1
-                          }`}
+  src={
+    typeof image === "string"
+      ? image.startsWith("http")
+        ? image
+        : `${import.meta.env.VITE_API_URL}${image}`
+      : URL.createObjectURL(image)
+  }
+  alt={`${variant.color} ${
+    imageIndex + 1
+  }`}
                           style={{
                             width:
                               "100%",
